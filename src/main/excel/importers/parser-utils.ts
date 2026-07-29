@@ -162,6 +162,7 @@ export interface ParsedCustomerRow {
   bankName: string | null;
   bankAccount: string | null;
   bankAccountUnsafeNumericPrecision: boolean;
+  phoneUnsafeNumericPrecision: boolean;
   email: string | null;
   isDefaultAddress: boolean;
 }

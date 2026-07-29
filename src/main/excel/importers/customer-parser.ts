@@ -44,13 +44,17 @@ export async function parseCustomerExcel(filePath: string): Promise<ParsedCustom
     const bankAccountCell = colMap.bankAccount > 0
       ? cellToIdentifierText(row.getCell(colMap.bankAccount))
       : { text: '', unsafeNumericPrecision: false };
+    const phoneCell = colMap.phone > 0
+      ? cellToIdentifierText(row.getCell(colMap.phone))
+      : { text: '', unsafeNumericPrecision: false };
 
     rows.push({
       rowIndex: r, name, taxId,
       taxIdUnsafeNumericPrecision: taxIdCell.unsafeNumericPrecision,
       shortCode: colMap.shortCode > 0 ? trimInvisible(cellToText(row.getCell(colMap.shortCode))) || null : null,
       address: colMap.address > 0 ? trimInvisible(cellToText(row.getCell(colMap.address))) || null : null,
-      phone: colMap.phone > 0 ? trimInvisible(cellToText(row.getCell(colMap.phone))) || null : null,
+      phone: trimInvisible(phoneCell.text) || null,
+      phoneUnsafeNumericPrecision: phoneCell.unsafeNumericPrecision,
       bankName: colMap.bankName > 0 ? trimInvisible(cellToText(row.getCell(colMap.bankName))) || null : null,
       bankAccount: trimInvisible(bankAccountCell.text) || null,
       bankAccountUnsafeNumericPrecision: bankAccountCell.unsafeNumericPrecision,

@@ -26,6 +26,7 @@ export interface CustomerImportPreviewRow {
   phone: string | null;
   bankName: string | null;
   bankAccount: string | null;
+  phoneUnsafeNumericPrecision: boolean;
   email: string | null;
   isDefaultAddress: boolean;
   errors: string[];
@@ -44,6 +45,7 @@ export interface CustomerImportPreviewResult {
 export interface CustomerImportRawRow extends Omit<CustomerImportPreviewRow, 'errors'> {
   taxIdUnsafeNumericPrecision: boolean;
   bankAccountUnsafeNumericPrecision: boolean;
+  phoneUnsafeNumericPrecision: boolean;
 }
 
 /** 预览令牌 -> 预览数据缓存 */
@@ -56,16 +58,19 @@ function validateRow(row: CustomerImportPreviewRow, raw: CustomerImportRawRow): 
   if (!row.taxId) errors.push('纳税人识别号必填');
 
   if (row.taxId && raw.taxIdUnsafeNumericPrecision) {
-    errors.push('纳税人识别号疑似数值化且超过 15 位精度');
+    errors.push('纳税人识别号被 Excel 自动转为数字，超过 15 位已丢失精度，请以文本格式填写或使用系统模板');
   }
   if (row.phone && isScientificNotation(row.phone)) {
-    errors.push('电话疑似科学计数法');
+    errors.push('电话疑似科学计数法，已丢失精度');
+  }
+  if (row.phone && raw.phoneUnsafeNumericPrecision) {
+    errors.push('电话被 Excel 自动转为数字，超过 15 位已丢失精度，请以文本格式填写或使用系统模板');
   }
   if (row.bankAccount && isScientificNotation(row.bankAccount)) {
     errors.push('银行账号疑似科学计数法，已丢失精度');
   }
   if (row.bankAccount && raw.bankAccountUnsafeNumericPrecision) {
-    errors.push('银行账号疑似数值化且超过 15 位精度');
+    errors.push('银行账号被 Excel 自动转为数字，超过 15 位已丢失精度，请以文本格式（系统模板）填写');
   }
   if (row.email && row.email !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
     errors.push('邮箱格式不正确');
@@ -92,6 +97,7 @@ export function buildCustomerPreview(
       phone: raw.phone,
       bankName: raw.bankName,
       bankAccount: raw.bankAccount,
+      phoneUnsafeNumericPrecision: raw.phoneUnsafeNumericPrecision,
       email: raw.email,
       isDefaultAddress: raw.isDefaultAddress,
       errors: [],

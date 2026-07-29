@@ -34,6 +34,20 @@ declare module 'xlsx-populate' {
     autoFilter(): Range;
   }
 
+  export interface DataValidationOptions {
+    type?: string;
+    operator?: string;
+    formula1?: string;
+    formula2?: string;
+    allowBlank?: boolean;
+    showInputMessage?: boolean;
+    prompt?: string;
+    showErrorMessage?: boolean;
+    error?: string;
+    errorTitle?: string;
+    errorStyle?: string;
+  }
+
   export interface Sheet {
     name(): string;
     cell(address: string): Cell;
@@ -45,6 +59,7 @@ declare module 'xlsx-populate' {
     autoFilter: string | null;
     hidden(): boolean;
     hidden(h: boolean): Sheet;
+    dataValidation(range: string, options: DataValidationOptions): Sheet;
   }
 
   export interface Workbook {

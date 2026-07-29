@@ -37,6 +37,18 @@ function writeHeaders(
   });
 }
 
+/** 列号（1-based）转为 Excel 列字母，如 7 -> "G" */
+function columnLetter(col: number): string {
+  let n = col;
+  let s = '';
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    s = String.fromCharCode(65 + rem) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
 /** 生成客户导入模板并保存到指定路径 */
 export async function generateCustomerTemplate(savePath: string): Promise<void> {
   const { wb, sheet } = await withSheet('客户信息');
@@ -45,9 +57,13 @@ export async function generateCustomerTemplate(savePath: string): Promise<void> 
   const widths = [30, 25, 15, 40, 15, 25, 25, 25, 15];
   writeHeaders(sheet, headers, widths);
 
-  // 税号、电话和银行账号必须按文本保存
+  // 税号、电话和银行账号必须按文本保存（设 @ 格式 + 数据验证提示）
   for (const col of [2, 5, 7]) {
     sheet.column(col).style('numberFormat', TEXT_FORMAT);
+    sheet.dataValidation(
+      `${columnLetter(col)}2:${columnLetter(col)}1000`,
+      { type: 'custom', formula1: `=ISTEXT(${columnLetter(col)}2)`, allowBlank: true },
+    );
   }
   await wb.toFileAsync(savePath);
 }

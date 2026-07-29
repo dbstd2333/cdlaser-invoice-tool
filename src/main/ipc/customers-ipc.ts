@@ -65,6 +65,7 @@ export function registerCustomersIpc(): void {
         bankName: p.bankName,
         bankAccount: p.bankAccount,
         bankAccountUnsafeNumericPrecision: p.bankAccountUnsafeNumericPrecision,
+        phoneUnsafeNumericPrecision: p.phoneUnsafeNumericPrecision,
         email: p.email,
         isDefaultAddress: p.isDefaultAddress,
       })),
