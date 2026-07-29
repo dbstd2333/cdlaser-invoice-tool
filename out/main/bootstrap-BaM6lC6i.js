@@ -873,7 +873,8 @@ var priceVersionQuerySchema = zod.z.object({
 /** 销项开票行 */
 var outboundLineInputSchema = zod.z.object({
 	priceVersionId: zod.z.string().min(1),
-	quantity: zod.z.number().int().positive("数量必须为正整数")
+	quantity: zod.z.number().int().positive("数量必须为正整数"),
+	amountCent: zod.z.number().int().positive("金额必须大于 0").optional()
 });
 /** 销项导出请求 */
 var outboundExportSchema = zod.z.object({
@@ -1653,10 +1654,11 @@ function validateRow$1(row, raw) {
 	const errors = [];
 	if (!row.name) errors.push("客户名称必填");
 	if (!row.taxId) errors.push("纳税人识别号必填");
-	if (row.taxId && raw.taxIdUnsafeNumericPrecision) errors.push("纳税人识别号疑似数值化且超过 15 位精度");
-	if (row.phone && isScientificNotation(row.phone)) errors.push("电话疑似科学计数法");
+	if (row.taxId && raw.taxIdUnsafeNumericPrecision) errors.push("纳税人识别号被 Excel 自动转为数字，超过 15 位已丢失精度，请以文本格式填写或使用系统模板");
+	if (row.phone && isScientificNotation(row.phone)) errors.push("电话疑似科学计数法，已丢失精度");
+	if (row.phone && raw.phoneUnsafeNumericPrecision) errors.push("电话被 Excel 自动转为数字，超过 15 位已丢失精度，请以文本格式填写或使用系统模板");
 	if (row.bankAccount && isScientificNotation(row.bankAccount)) errors.push("银行账号疑似科学计数法，已丢失精度");
-	if (row.bankAccount && raw.bankAccountUnsafeNumericPrecision) errors.push("银行账号疑似数值化且超过 15 位精度");
+	if (row.bankAccount && raw.bankAccountUnsafeNumericPrecision) errors.push("银行账号被 Excel 自动转为数字，超过 15 位已丢失精度，请以文本格式（系统模板）填写");
 	if (row.email && row.email !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) errors.push("邮箱格式不正确");
 	return errors;
 }
@@ -1676,6 +1678,7 @@ function buildCustomerPreview(rawRows) {
 			phone: raw.phone,
 			bankName: raw.bankName,
 			bankAccount: raw.bankAccount,
+			phoneUnsafeNumericPrecision: raw.phoneUnsafeNumericPrecision,
 			email: raw.email,
 			isDefaultAddress: raw.isDefaultAddress,
 			errors: []
@@ -1925,6 +1928,10 @@ async function parseCustomerExcel(filePath) {
 			text: "",
 			unsafeNumericPrecision: false
 		};
+		const phoneCell = colMap.phone > 0 ? cellToIdentifierText(row.getCell(colMap.phone)) : {
+			text: "",
+			unsafeNumericPrecision: false
+		};
 		rows.push({
 			rowIndex: r,
 			name,
@@ -1932,7 +1939,8 @@ async function parseCustomerExcel(filePath) {
 			taxIdUnsafeNumericPrecision: taxIdCell.unsafeNumericPrecision,
 			shortCode: colMap.shortCode > 0 ? trimInvisible(cellToText(row.getCell(colMap.shortCode))) || null : null,
 			address: colMap.address > 0 ? trimInvisible(cellToText(row.getCell(colMap.address))) || null : null,
-			phone: colMap.phone > 0 ? trimInvisible(cellToText(row.getCell(colMap.phone))) || null : null,
+			phone: trimInvisible(phoneCell.text) || null,
+			phoneUnsafeNumericPrecision: phoneCell.unsafeNumericPrecision,
 			bankName: colMap.bankName > 0 ? trimInvisible(cellToText(row.getCell(colMap.bankName))) || null : null,
 			bankAccount: trimInvisible(bankAccountCell.text) || null,
 			bankAccountUnsafeNumericPrecision: bankAccountCell.unsafeNumericPrecision,
@@ -2132,6 +2140,17 @@ function writeHeaders(sheet, headers, widths, align = false) {
 		}
 	});
 }
+/** 列号（1-based）转为 Excel 列字母，如 7 -> "G" */
+function columnLetter(col) {
+	let n = col;
+	let s = "";
+	while (n > 0) {
+		const rem = (n - 1) % 26;
+		s = String.fromCharCode(65 + rem) + s;
+		n = Math.floor((n - 1) / 26);
+	}
+	return s;
+}
 /** 生成客户导入模板并保存到指定路径 */
 async function generateCustomerTemplate(savePath) {
 	const { wb, sheet } = await withSheet("客户信息");
@@ -2160,7 +2179,14 @@ async function generateCustomerTemplate(savePath) {
 		2,
 		5,
 		7
-	]) sheet.column(col).style("numberFormat", TEXT_FORMAT);
+	]) {
+		sheet.column(col).style("numberFormat", TEXT_FORMAT);
+		sheet.dataValidation(`${columnLetter(col)}2:${columnLetter(col)}1000`, {
+			type: "custom",
+			formula1: `=ISTEXT(${columnLetter(col)}2)`,
+			allowBlank: true
+		});
+	}
 	await wb.toFileAsync(savePath);
 }
 /** 生成商品导入模板并保存到指定路径 */
@@ -2262,6 +2288,7 @@ function registerCustomersIpc() {
 			bankName: p.bankName,
 			bankAccount: p.bankAccount,
 			bankAccountUnsafeNumericPrecision: p.bankAccountUnsafeNumericPrecision,
+			phoneUnsafeNumericPrecision: p.phoneUnsafeNumericPrecision,
 			email: p.email,
 			isDefaultAddress: p.isDefaultAddress
 		})));
@@ -2495,6 +2522,12 @@ var OUTBOUND_AMOUNT_FACTOR = "1.09";
 */
 function calcOutboundAmountCent(quantity, taxInclusiveUnitPrice, factor = OUTBOUND_AMOUNT_FACTOR) {
 	return new decimal_js.default(quantity).times(new decimal_js.default(taxInclusiveUnitPrice)).times(new decimal_js.default(factor)).toDecimalPlaces(2, decimal_js.default.ROUND_HALF_UP).times(100).round().toNumber();
+}
+/** 最终金额（分）按数量反推每件开票单价，保留 13 位小数。 */
+function amountCentToUnitPrice(amountCent, quantity) {
+	if (!Number.isInteger(amountCent) || amountCent <= 0) throw new Error("金额必须为正整数分");
+	if (!Number.isInteger(quantity) || quantity <= 0) throw new Error("数量必须为正整数");
+	return new decimal_js.default(amountCent).div(100).div(quantity).toDecimalPlaces(13, decimal_js.default.ROUND_HALF_UP).toString();
 }
 /** 单价 × 系数（保留 13 位小数），用于销项导出「商品单价」列 = 含税单价 × 系数 */
 function scaleUnitPrice(unitPrice, factor) {
@@ -3085,7 +3118,8 @@ function validateDraft(input) {
 			unitPriceDecimal: pvRow.unit_price_decimal,
 			taxRate: pvRow.tax_rate,
 			stockBalance: pvRow.stock_balance,
-			quantity: line.quantity
+			quantity: line.quantity,
+			amountCent: line.amountCent
 		});
 	}
 	return result;
@@ -3277,7 +3311,7 @@ async function executeOutboundExport(input) {
 /** 构造税务模板行 */
 function buildTaxLines(lines, factor) {
 	return lines.map((l) => {
-		const amountCent = calcOutboundAmountCent(l.quantity, l.unitPriceDecimal, factor);
+		const amountCent = resolveLineAmountCent(l, factor);
 		const product = getProductById(getPriceVersionById(l.priceVersionId).productId);
 		return {
 			name: escapeFormulaInjection(trimInvisible(l.name)),
@@ -3285,7 +3319,7 @@ function buildTaxLines(lines, factor) {
 			model: escapeFormulaInjection(trimInvisible(l.model)),
 			unit: escapeFormulaInjection(trimInvisible(l.unit)),
 			quantity: l.quantity,
-			unitPriceDecimal: scaleUnitPrice(normalizeUnitPrice(l.unitPriceDecimal), factor),
+			unitPriceDecimal: l.amountCent ? amountCentToUnitPrice(amountCent, l.quantity) : scaleUnitPrice(normalizeUnitPrice(l.unitPriceDecimal), factor),
 			amountYuan: centToYuan(amountCent),
 			taxRate: TAX_RATE_DECIMAL
 		};
@@ -3296,7 +3330,7 @@ function calculateTotals$1(lines, factor) {
 	let totalQuantity = 0, totalAmountCent = 0, totalCent = 0;
 	for (const line of lines) {
 		totalQuantity += line.quantity;
-		const amountCent = calcOutboundAmountCent(line.quantity, line.unitPriceDecimal, factor);
+		const amountCent = resolveLineAmountCent(line, factor);
 		totalAmountCent += amountCent;
 		totalCent += amountCent;
 	}
@@ -3313,7 +3347,7 @@ function processOutboundLine(db, raw, batchId, batchNo, exportedAt, line, factor
 	if (!pvRow) throw new Error(`价格版本 ${line.priceVersionId} 不存在`);
 	const stockBefore = pvRow.stock_balance;
 	const stockAfter = stockBefore - line.quantity;
-	const amountCent = calcOutboundAmountCent(line.quantity, line.unitPriceDecimal, factor);
+	const amountCent = resolveLineAmountCent(line, factor);
 	const product = getProductById(getPriceVersionById(line.priceVersionId).productId);
 	db.insert(outboundLines).values({
 		id: (0, uuid.v7)(),
@@ -3344,6 +3378,10 @@ function processOutboundLine(db, raw, batchId, batchNo, exportedAt, line, factor
 		stockBalance: stockAfter,
 		updatedAt: exportedAt
 	}).where((0, drizzle_orm.eq)(priceVersions.id, line.priceVersionId)).run();
+}
+/** 优先使用用户编辑后的最终金额，否则按统一系数计算。 */
+function resolveLineAmountCent(line, factor) {
+	return line.amountCent ?? calcOutboundAmountCent(line.quantity, line.unitPriceDecimal, factor);
 }
 /** 构建客户快照 */
 function buildCustomerSnapshot(customer) {

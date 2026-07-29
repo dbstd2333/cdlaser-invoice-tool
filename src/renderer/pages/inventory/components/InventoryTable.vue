@@ -1,24 +1,48 @@
 <template>
   <div class="table-container">
-    <div class="table-options">
-      <ElCheckbox v-model="showTaxCode">显示税收分类编码列</ElCheckbox>
-    </div>
     <ElTable
       :data="rows"
       v-loading="loading"
       border
       stripe
-      size="default"
+      size="large"
       row-key="priceVersionId"
       :max-height="tableMaxHeight"
-      @selection-change="handleSelectionChange"
+      class="invoice-table"
     >
-      <ElTableColumn type="selection" width="50" :reserve-selection="true" />
-      <ElTableColumn prop="name" label="项目名称" min-width="180" show-overflow-tooltip />
-      <ElTableColumn prop="model" label="型号" width="120" show-overflow-tooltip />
+      <ElTableColumn
+        label="开票数量"
+        width="128"
+        fixed="left"
+        align="center"
+        class-name="quantity-column"
+      >
+        <template #default="{ row }">
+          <ElInputNumber
+            :model-value="selectionStore.getQuantity(row.priceVersionId)"
+            :min="0"
+            :step="1"
+            :precision="0"
+            size="small"
+            class="quantity-stepper"
+            @change="handleQuantityChange(row, $event)"
+          />
+        </template>
+      </ElTableColumn>
+      <ElTableColumn prop="name" label="商品 / 项目名称" min-width="220" show-overflow-tooltip />
+      <ElTableColumn prop="model" label="规格型号" min-width="140" show-overflow-tooltip />
       <ElTableColumn prop="unit" label="单位" width="80" />
-      <ElTableColumn v-if="showTaxCode" prop="taxClassificationCode" label="税收分类编码" min-width="150" show-overflow-tooltip />
-      <ElTableColumn prop="unitPriceDecimal" label="含税单价" width="130" />
+      <ElTableColumn prop="unitPriceDecimal" label="含税单价（元）" width="140" align="right">
+        <template #default="{ row }">¥{{ row.unitPriceDecimal }}</template>
+      </ElTableColumn>
+      <ElTableColumn label="本行已选金额" width="150" align="right">
+        <template #default="{ row }">
+          <strong v-if="selectionStore.getQuantity(row.priceVersionId) > 0" class="line-amount">
+            ¥{{ selectedLineAmount(row) }}
+          </strong>
+          <span v-else class="empty-amount">—</span>
+        </template>
+      </ElTableColumn>
       <ElTableColumn label="当前库存" width="120">
         <template #default="{ row }">
           <ElTag :type="stockTagType(row.stockBalance)" size="small">
@@ -29,7 +53,7 @@
       <ElTableColumn prop="updatedAt" label="最近变更" width="160">
         <template #default="{ row }">{{ formatTime(row.updatedAt) }}</template>
       </ElTableColumn>
-      <ElTableColumn label="操作" width="270" fixed="right">
+      <ElTableColumn label="商品操作" width="270" fixed="right">
         <template #default="{ row }">
           <ElButton link type="info" size="small" @click="$emit('viewHistory', row)">历史记录</ElButton>
           <ElButton link type="primary" size="small" @click="$emit('editProduct', row)">编辑</ElButton>
@@ -53,9 +77,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 import type { PriceVersionRow } from '@shared/contracts/types';
 import { getStockStatusText } from '@shared/contracts/types';
+import { calcOutboundAmountCent, centToDisplay } from '@shared/money';
+import { useSelectionStore } from '../../../stores/selection';
 
 const props = defineProps<{
   rows: PriceVersionRow[];
@@ -72,9 +98,10 @@ const emit = defineEmits<{
   deleteProduct: [row: PriceVersionRow];
   pageChange: [page: number];
   sizeChange: [size: number];
-  selectionChange: [row: PriceVersionRow, selected: boolean];
+  quantityChange: [row: PriceVersionRow, quantity: number];
 }>();
 
+const selectionStore = useSelectionStore();
 const currentPage = computed({
   get: () => props.page,
   set: () => {},
@@ -84,15 +111,21 @@ const currentPageSize = computed({
   set: () => {},
 });
 
-const showTaxCode = ref(true);
-const tableMaxHeight = ref(550);
+const tableMaxHeight = 'calc(100vh - 360px)';
 
-function handleSelectionChange(selectedRows: PriceVersionRow[]): void {
-  // 计算当前页的勾选变化
-  const selectedIds = new Set(selectedRows.map((r) => r.priceVersionId));
-  for (const row of props.rows) {
-    emit('selectionChange', row, selectedIds.has(row.priceVersionId));
-  }
+/** 将数量步进器的空值安全归零后通知页面。 */
+function handleQuantityChange(row: PriceVersionRow, quantity: number | undefined): void {
+  emit('quantityChange', row, quantity ?? 0);
+}
+
+/** 计算主表中当前行未加利润的已选金额。 */
+function selectedLineAmount(row: PriceVersionRow): string {
+  const amountCent = calcOutboundAmountCent(
+    selectionStore.getQuantity(row.priceVersionId),
+    row.unitPriceDecimal,
+    '1',
+  );
+  return centToDisplay(amountCent);
 }
 
 function stockTagType(balance: number): string {
@@ -115,7 +148,28 @@ function formatTime(iso: string): string {
 </script>
 
 <style scoped>
-.table-options {
-  padding: 0 0 8px;
+.invoice-table {
+  width: 100%;
+  --el-table-header-bg-color: #f2f5f9;
+  --el-table-header-text-color: #354052;
+}
+
+.quantity-stepper {
+  width: 104px;
+}
+
+.invoice-table :deep(.quantity-column .cell) {
+  padding: 0 8px;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.line-amount {
+  color: var(--el-color-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty-amount {
+  color: var(--text-secondary);
 }
 </style>

@@ -79,6 +79,7 @@ export const priceVersionQuerySchema = z.object({
 export const outboundLineInputSchema = z.object({
   priceVersionId: z.string().min(1),
   quantity: z.number().int().positive('数量必须为正整数'),
+  amountCent: z.number().int().positive('金额必须大于 0').optional(),
 });
 
 /** 销项导出请求 */

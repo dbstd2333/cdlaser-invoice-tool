@@ -4,6 +4,9 @@ import {
   taxExclusiveUnitPrice,
   calcAmountCent,
   calcOutboundAmountCent,
+  scaleAmountCent,
+  amountCentToUnitPrice,
+  roundCentToWholeYuan,
   scaleUnitPrice,
   calcTaxCent,
   calcTotalCent,
@@ -99,6 +102,22 @@ describe('金额计算', () => {
     it('应保留 13 位小数', () => {
       // 1.13 × 1.09 = 1.2317
       expect(scaleUnitPrice('1.13', '1.09')).toBe('1.2317');
+    });
+  });
+
+  describe('开票金额编辑辅助计算', () => {
+    it('应按 1.09 计算已选总金额的利润金额', () => {
+      expect(scaleAmountCent(10001, '1.09')).toBe(10901);
+    });
+
+    it('应根据最终金额和数量反推开票单价', () => {
+      expect(amountCentToUnitPrice(10001, 2)).toBe('50.005');
+    });
+
+    it('应将角分金额四舍五入到整数元', () => {
+      expect(roundCentToWholeYuan(12549)).toBe(12500);
+      expect(roundCentToWholeYuan(12550)).toBe(12600);
+      expect(roundCentToWholeYuan(12600)).toBe(12600);
     });
   });
 

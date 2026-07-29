@@ -4,7 +4,15 @@ import { outboundBatches, outboundLines, priceVersions } from '../../db/schema/i
 import { eq } from 'drizzle-orm';
 import type { OutboundExportInput } from '@shared/schemas/index';
 import type { CustomerSnapshot } from '@shared/contracts/types';
-import { centToYuan, normalizeUnitPrice, calcOutboundAmountCent, scaleUnitPrice, OUTBOUND_AMOUNT_FACTOR, TAX_RATE_DECIMAL } from '@shared/money/index';
+import {
+  amountCentToUnitPrice,
+  calcOutboundAmountCent,
+  centToYuan,
+  normalizeUnitPrice,
+  OUTBOUND_AMOUNT_FACTOR,
+  scaleUnitPrice,
+  TAX_RATE_DECIMAL,
+} from '@shared/money/index';
 import { trimInvisible, generateBatchNo, escapeFormulaInjection } from '@shared/contracts/normalize';
 import { recordAudit } from '../audit/audit-service';
 import { appendLedger } from '../inventory/ledger-service';
@@ -78,9 +86,9 @@ export async function executeOutboundExport(input: OutboundExportInput): Promise
 }
 
 /** 构造税务模板行 */
-function buildTaxLines(lines: Array<{ priceVersionId: string; name: string; model: string; unit: string; unitPriceDecimal: string; quantity: number }>, factor: string): TaxTemplateLine[] {
+function buildTaxLines(lines: Array<{ priceVersionId: string; name: string; model: string; unit: string; unitPriceDecimal: string; quantity: number; amountCent?: number }>, factor: string): TaxTemplateLine[] {
   return lines.map((l) => {
-    const amountCent = calcOutboundAmountCent(l.quantity, l.unitPriceDecimal, factor);
+    const amountCent = resolveLineAmountCent(l, factor);
     const pv = getPriceVersionById(l.priceVersionId)!;
     const product = getProductById(pv.productId)!;
     return {
@@ -89,7 +97,9 @@ function buildTaxLines(lines: Array<{ priceVersionId: string; name: string; mode
       model: escapeFormulaInjection(trimInvisible(l.model)),
       unit: escapeFormulaInjection(trimInvisible(l.unit)),
       quantity: l.quantity,
-      unitPriceDecimal: scaleUnitPrice(normalizeUnitPrice(l.unitPriceDecimal), factor),
+      unitPriceDecimal: l.amountCent
+        ? amountCentToUnitPrice(amountCent, l.quantity)
+        : scaleUnitPrice(normalizeUnitPrice(l.unitPriceDecimal), factor),
       amountYuan: centToYuan(amountCent),
       taxRate: TAX_RATE_DECIMAL,
     };
@@ -97,13 +107,13 @@ function buildTaxLines(lines: Array<{ priceVersionId: string; name: string; mode
 }
 
 /** 计算汇总金额 */
-function calculateTotals(lines: Array<{ quantity: number; unitPriceDecimal: string }>, factor: string): {
+function calculateTotals(lines: Array<{ quantity: number; unitPriceDecimal: string; amountCent?: number }>, factor: string): {
   totalQuantity: number; totalAmountCent: number; totalTaxCent: number; totalCent: number;
 } {
   let totalQuantity = 0, totalAmountCent = 0, totalCent = 0;
   for (const line of lines) {
     totalQuantity += line.quantity;
-    const amountCent = calcOutboundAmountCent(line.quantity, line.unitPriceDecimal, factor);
+    const amountCent = resolveLineAmountCent(line, factor);
     totalAmountCent += amountCent;
     totalCent += amountCent;
   }
@@ -117,7 +127,7 @@ function processOutboundLine(
   batchId: string,
   batchNo: string,
   exportedAt: string,
-  line: { priceVersionId: string; quantity: number; unitPriceDecimal: string; name: string },
+  line: { priceVersionId: string; quantity: number; unitPriceDecimal: string; name: string; amountCent?: number },
   factor: string,
 ): void {
   const pvRow = raw.prepare('SELECT stock_balance FROM price_versions WHERE id = ?').get(line.priceVersionId) as { stock_balance: number } | undefined;
@@ -125,7 +135,7 @@ function processOutboundLine(
 
   const stockBefore = pvRow.stock_balance;
   const stockAfter = stockBefore - line.quantity;
-  const amountCent = calcOutboundAmountCent(line.quantity, line.unitPriceDecimal, factor);
+  const amountCent = resolveLineAmountCent(line, factor);
 
   const product = getProductById(getPriceVersionById(line.priceVersionId)!.productId)!;
 
@@ -146,6 +156,14 @@ function processOutboundLine(
   db.update(priceVersions)
     .set({ stockBalance: stockAfter, updatedAt: exportedAt })
     .where(eq(priceVersions.id, line.priceVersionId)).run();
+}
+
+/** 优先使用用户编辑后的最终金额，否则按统一系数计算。 */
+function resolveLineAmountCent(
+  line: { quantity: number; unitPriceDecimal: string; amountCent?: number },
+  factor: string,
+): number {
+  return line.amountCent ?? calcOutboundAmountCent(line.quantity, line.unitPriceDecimal, factor);
 }
 
 /** 构建客户快照 */

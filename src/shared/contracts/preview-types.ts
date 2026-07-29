@@ -80,6 +80,7 @@ export interface DraftValidationResult {
     taxRate: number;
     stockBalance: number;
     quantity: number;
+    amountCent?: number;
   }>;
   invalidPriceVersionIds: string[];
   errors: string[];

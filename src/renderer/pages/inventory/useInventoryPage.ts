@@ -3,6 +3,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { api } from '../../api';
 import { useAppStore } from '../../stores/app';
 import { useSelectionStore } from '../../stores/selection';
+import type { SelectedPriceVersion } from '../../stores/selection';
 import type { PriceVersionRow } from '@shared/contracts/types';
 
 /**
@@ -15,7 +16,6 @@ export function useInventoryPage() {
   const loading = ref(false);
   const rows = ref<PriceVersionRow[]>([]);
   const total = ref(0);
-  const showSelected = ref(false);
 
   const query = reactive({
     name: '',
@@ -29,7 +29,7 @@ export function useInventoryPage() {
   const editingProductId = ref('');
   const historyPriceVersionId = ref('');
   const adjustPriceVersionId = ref('');
-  const outboundLines = ref<PriceVersionRow[]>([]);
+  const outboundLines = ref<SelectedPriceVersion[]>([]);
 
   const initialImportVisible = ref(false);
   const dailyImportVisible = ref(false);
@@ -55,13 +55,13 @@ export function useInventoryPage() {
   function handlePageChange(page: number): void { query.page = page; loadData(); }
   function handleSizeChange(size: number): void { query.pageSize = size; query.page = 1; loadData(); }
 
-  function handleSelectionChange(row: PriceVersionRow, selected: boolean): void {
-    selectionStore.toggleSelection(row, selected);
+  function handleQuantityChange(row: PriceVersionRow, quantity: number): void {
+    selectionStore.setQuantity(row, quantity);
   }
 
   function handleOutbound(): void {
-    const selected = selectionStore.getSelected();
-    if (selected.length === 0) { ElMessage.warning('请先勾选价格版本'); return; }
+    const selected = selectionStore.getSelectedEntries();
+    if (selected.length === 0) { ElMessage.warning('请先在商品左侧增加开票数量'); return; }
     outboundLines.value = selected; modalType.value = 'outbound';
   }
 
@@ -73,7 +73,7 @@ export function useInventoryPage() {
   function handleViewHistoryGlobal(): void {
     const selected = selectionStore.getSelected();
     if (selected.length > 0) { historyPriceVersionId.value = selected[0].priceVersionId; }
-    else { ElMessage.info('请先勾选价格版本，或在行操作中点击"历史记录"'); return; }
+    else { ElMessage.info('请先设置一项开票数量，或在行操作中点击“历史记录”'); return; }
     modalType.value = 'history';
   }
 
@@ -84,7 +84,7 @@ export function useInventoryPage() {
     } catch (err) { if (err !== 'cancel') ElMessage.error(`删除失败: ${(err as Error).message}`); }
   }
 
-  function handleClearSelection(): void { selectionStore.clearSelection(); showSelected.value = false; }
+  function handleClearSelection(): void { selectionStore.clearSelection(); }
 
   function handleImportSuccess(): void {
     initialImportVisible.value = false; dailyImportVisible.value = false;
@@ -92,11 +92,11 @@ export function useInventoryPage() {
   }
 
   return {
-    appStore, selectionStore, loading, rows, total, showSelected,
+    appStore, selectionStore, loading, rows, total,
     query, modalType, editingProductId, historyPriceVersionId, adjustPriceVersionId, outboundLines,
     initialImportVisible, dailyImportVisible, replenishmentVisible, inboundVisible, importRecordsVisible,
     loadData, handleSearch, handleReset, handlePageChange, handleSizeChange,
-    handleSelectionChange, handleOutbound, handleAddProduct, handleEditProduct,
+    handleQuantityChange, handleOutbound, handleAddProduct, handleEditProduct,
     handleViewHistory, handleAdjustStock, handleViewHistoryGlobal,
     handleDeleteProduct, handleClearSelection, handleImportSuccess,
     handleInitialImport: () => { initialImportVisible.value = true; },

@@ -33,14 +33,14 @@ import OutboundExportDialog from './OutboundExportDialog.vue';
 import ProductFormDialog from './ProductFormDialog.vue';
 import HistoryRecordDialog from './HistoryRecordDialog.vue';
 import InventoryAdjustDialog from './InventoryAdjustDialog.vue';
-import type { PriceVersionRow } from '@shared/contracts/types';
+import type { SelectedPriceVersion } from '../../../stores/selection';
 
 defineProps<{
   modalType: 'none' | 'product-form' | 'history' | 'adjust' | 'outbound';
   editingProductId: string;
   historyPriceVersionId: string;
   adjustPriceVersionId: string;
-  outboundLines: PriceVersionRow[];
+  outboundLines: SelectedPriceVersion[];
 }>();
 
 const emit = defineEmits<{

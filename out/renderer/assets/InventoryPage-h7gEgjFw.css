@@ -39,11 +39,48 @@
   flex-wrap: wrap;
 }
 
-.table-options[data-v-c01890cb] {
-  padding: 0 0 8px;
+.invoice-table[data-v-260aa3ae] {
+  width: 100%;
+  --el-table-header-bg-color: #f2f5f9;
+  --el-table-header-text-color: #354052;
+}
+.quantity-stepper[data-v-260aa3ae] {
+  width: 104px;
+}
+.invoice-table[data-v-260aa3ae] .quantity-column .cell {
+  padding: 0 8px;
+  overflow: visible;
+  text-overflow: clip;
+}
+.line-amount[data-v-260aa3ae] {
+  color: var(--el-color-primary);
+  font-variant-numeric: tabular-nums;
+}
+.empty-amount[data-v-260aa3ae] {
+  color: var(--text-secondary);
 }
 
-.summary-bar[data-v-25ad2562] {
+.line-table-tools[data-v-270073e6] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.line-table-tools strong[data-v-270073e6] {
+  margin-right: 10px;
+  font-size: 15px;
+}
+.line-table-tools span[data-v-270073e6] {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.amount-input[data-v-270073e6] .el-input__inner {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.summary-bar[data-v-270073e6] {
   display: flex;
   gap: 24px;
   padding: 12px 16px;
@@ -52,12 +89,12 @@
   font-size: 14px;
   margin-top: 12px;
 }
-.summary-bar .total[data-v-25ad2562] {
+.summary-bar .total[data-v-270073e6] {
   font-weight: 600;
   color: var(--el-color-primary);
 }
 
-.outbound-content[data-v-43033b8f] {
+.outbound-content[data-v-1ce32b3e] {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -121,11 +158,39 @@
 .error-text[data-v-8c8ed819] { color: var(--color-negative); font-size: 12px;
 }
 
-.selection-bar[data-v-03373a28] {
+.selection-bar[data-v-39ad85e1] {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 0;
+  gap: 8px;
+  min-height: 50px;
+  margin: 0 0 10px;
+  padding: 8px 12px;
   font-size: 14px;
   color: var(--text-regular);
+  background: #f7f9fc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid var(--el-color-primary);
+  border-radius: 6px;
+}
+.selection-metric[data-v-39ad85e1] {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 4px 12px;
+  border-right: 1px solid #dfe5ec;
+}
+.selection-metric strong[data-v-39ad85e1] {
+  color: #17233d;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+.selection-metric.profit strong[data-v-39ad85e1] {
+  color: #b45309;
+}
+.metric-label[data-v-39ad85e1] {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.selection-bar .el-button[data-v-39ad85e1] {
+  margin-left: auto;
 }

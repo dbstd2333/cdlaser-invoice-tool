@@ -60,6 +60,7 @@ export function validateDraft(input: OutboundExportInput): DraftValidationResult
       taxRate: pvRow.tax_rate,
       stockBalance: pvRow.stock_balance,
       quantity: line.quantity,
+      amountCent: line.amountCent,
     });
   }
 

@@ -1,14 +1,14 @@
-import { Ai as Fragment, Bi as createVNode, Ca as reactive, Di as withKeys, Fi as createBlock, G as ElInput, Ii as createCommentVNode, Ka as toDisplayString, Li as createElementBlock, M as ElButton, Na as unref, Ni as computed, Pi as createBaseVNode, S as ElOption, Ta as ref, Ua as normalizeClass, Vi as defineComponent, _ as ElDescriptions, a as vLoading, aa as renderList, ba as isRef, c as ElTableColumn, d as ElDialog, dt as ElIcon, ea as onMounted, ga as withDirectives, ha as withCtx, i as ElMessage, k as ElTag, n as api, pa as watch, r as ElMessageBox, ra as openBlock, s as ElTable, sa as resolveComponent, t as _plugin_vue_export_helper_default, ta as onUnmounted, u as ElPagination, v as ElDescriptionsItem, w as ElSelect, y as ElCheckbox, zi as createTextVNode } from "./css-C8sLGSMG.js";
+import { Ai as Fragment, Bi as createVNode, Ca as reactive, Di as withKeys, Fi as createBlock, G as ElInput, Ii as createCommentVNode, Ka as toDisplayString, Li as createElementBlock, M as ElButton, Na as unref, Ni as computed, Pi as createBaseVNode, S as ElOption, Ta as ref, Ua as normalizeClass, Vi as defineComponent, _ as ElDescriptions, a as vLoading, aa as renderList, ba as isRef, c as ElTableColumn, d as ElDialog, dt as ElIcon, ea as onMounted, ga as withDirectives, ha as withCtx, i as ElMessage, k as ElTag, n as api, pa as watch, r as ElMessageBox, ra as openBlock, s as ElTable, sa as resolveComponent, t as _plugin_vue_export_helper_default, ta as onUnmounted, u as ElPagination, v as ElDescriptionsItem, w as ElSelect, zi as createTextVNode } from "./css-C8sLGSMG.js";
 import { i as ElAlert, n as ElForm, r as ElFormItem, s as defineStore, t as useAppStore } from "./css-FW2B8AwG.js";
 import { n as ElTabs, r as ElInputNumber, t as ElTabPane } from "./css-DRVPtfLM.js";
 import "./css-DSzxzpYd.js";
-import { n as centToDisplay, t as calcOutboundAmountCent } from "./money-DetyPBwL.js";
+import { a as scaleAmountCent, i as roundCentToWholeYuan, n as centToDisplay, o as yuanToCent, r as centToYuan, t as calcOutboundAmountCent } from "./money-CC3hjuJf.js";
 //#region src/renderer/pages/inventory/components/InventoryToolbar.vue?vue&type=script&setup=true&lang.ts
 var _hoisted_1$11 = { class: "inventory-toolbar" };
 var _hoisted_2$10 = { class: "toolbar-filters" };
-var _hoisted_3$7 = { class: "toolbar-actions" };
-var _hoisted_4$4 = { class: "action-col" };
-var _hoisted_5$3 = { class: "action-col-btns" };
+var _hoisted_3$8 = { class: "toolbar-actions" };
+var _hoisted_4$7 = { class: "action-col" };
+var _hoisted_5$5 = { class: "action-col-btns" };
 var _hoisted_6$3 = { class: "action-col" };
 var _hoisted_7 = { class: "action-col-btns" };
 var _hoisted_8 = { class: "action-col action-col-right" };
@@ -114,8 +114,8 @@ var InventoryToolbar_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/
 					default: withCtx(() => [..._cache[18] || (_cache[18] = [createTextVNode("刷新", -1)])]),
 					_: 1
 				})
-			]), createBaseVNode("div", _hoisted_3$7, [
-				createBaseVNode("div", _hoisted_4$4, [_cache[21] || (_cache[21] = createBaseVNode("div", { class: "action-col-title" }, "商品管理", -1)), createBaseVNode("div", _hoisted_5$3, [createVNode(_component_ElButton, {
+			]), createBaseVNode("div", _hoisted_3$8, [
+				createBaseVNode("div", _hoisted_4$7, [_cache[21] || (_cache[21] = createBaseVNode("div", { class: "action-col-title" }, "商品管理", -1)), createBaseVNode("div", _hoisted_5$5, [createVNode(_component_ElButton, {
 					type: "success",
 					onClick: _cache[8] || (_cache[8] = ($event) => _ctx.$emit("add-product"))
 				}, {
@@ -211,10 +211,133 @@ function getStockStatusText(balance) {
 	}
 }
 //#endregion
+//#region src/renderer/stores/selection.ts
+/**
+* 页面二跨分页选择 Store。
+* 以 priceVersionId 为键保存跨页选择；翻页、改变每页数量和改变筛选条件只更新当前页数据，不清空 Store。
+* 离开 /inventory 或开票成功后清空，取消开票 Dialog 时保留。
+*/
+var useSelectionStore = defineStore("selection", () => {
+	const selectedPriceVersions = ref(/* @__PURE__ */ new Map());
+	const selectedQuantities = ref(/* @__PURE__ */ new Map());
+	/** 获取已选数量 */
+	function selectedCount() {
+		return selectedPriceVersions.value.size;
+	}
+	/** 切换勾选 */
+	function toggleSelection(row, selected) {
+		if (selected) {
+			selectedPriceVersions.value.set(row.priceVersionId, row);
+			selectedQuantities.value.set(row.priceVersionId, selectedQuantities.value.get(row.priceVersionId) ?? 1);
+		} else {
+			selectedPriceVersions.value.delete(row.priceVersionId);
+			selectedQuantities.value.delete(row.priceVersionId);
+		}
+		selectedPriceVersions.value = new Map(selectedPriceVersions.value);
+		selectedQuantities.value = new Map(selectedQuantities.value);
+	}
+	/** 批量设置勾选 */
+	function setSelection(rows, selected) {
+		if (selected) for (const row of rows) {
+			selectedPriceVersions.value.set(row.priceVersionId, row);
+			selectedQuantities.value.set(row.priceVersionId, selectedQuantities.value.get(row.priceVersionId) ?? 1);
+		}
+		else for (const row of rows) {
+			selectedPriceVersions.value.delete(row.priceVersionId);
+			selectedQuantities.value.delete(row.priceVersionId);
+		}
+		selectedPriceVersions.value = new Map(selectedPriceVersions.value);
+		selectedQuantities.value = new Map(selectedQuantities.value);
+	}
+	/** 设置选品数量；0 表示从开票选择中移除。 */
+	function setQuantity(row, quantity) {
+		const normalized = Math.max(0, Math.trunc(quantity));
+		if (normalized === 0) {
+			selectedPriceVersions.value.delete(row.priceVersionId);
+			selectedQuantities.value.delete(row.priceVersionId);
+		} else {
+			selectedPriceVersions.value.set(row.priceVersionId, row);
+			selectedQuantities.value.set(row.priceVersionId, normalized);
+		}
+		selectedPriceVersions.value = new Map(selectedPriceVersions.value);
+		selectedQuantities.value = new Map(selectedQuantities.value);
+	}
+	/** 获取指定价格版本的开票数量。 */
+	function getQuantity(priceVersionId) {
+		return selectedQuantities.value.get(priceVersionId) ?? 0;
+	}
+	/** 检查是否已选 */
+	function isSelected(priceVersionId) {
+		return selectedPriceVersions.value.has(priceVersionId);
+	}
+	/** 获取全部已选 */
+	function getSelected() {
+		return Array.from(selectedPriceVersions.value.values());
+	}
+	/** 获取带数量的全部已选行。 */
+	function getSelectedEntries() {
+		return getSelected().map((row) => ({
+			row,
+			quantity: getQuantity(row.priceVersionId)
+		}));
+	}
+	/** 获取未加利润的已选商品总金额（分）。 */
+	function selectedAmountCent() {
+		return getSelectedEntries().reduce((sum, item) => sum + calcOutboundAmountCent(item.quantity, item.row.unitPriceDecimal, "1"), 0);
+	}
+	/** 获取已选总金额乘 1.09 后的加利润金额（分）。 */
+	function selectedProfitAmountCent() {
+		return scaleAmountCent(selectedAmountCent(), "1.09");
+	}
+	/** 获取全部已选 ID */
+	function getSelectedIds() {
+		return Array.from(selectedPriceVersions.value.keys());
+	}
+	/** 从已选中移除失效项 */
+	function removeInvalid(ids) {
+		for (const id of ids) {
+			selectedPriceVersions.value.delete(id);
+			selectedQuantities.value.delete(id);
+		}
+		selectedPriceVersions.value = new Map(selectedPriceVersions.value);
+		selectedQuantities.value = new Map(selectedQuantities.value);
+	}
+	/** 清空已选 */
+	function clearSelection() {
+		selectedPriceVersions.value = /* @__PURE__ */ new Map();
+		selectedQuantities.value = /* @__PURE__ */ new Map();
+	}
+	return {
+		selectedPriceVersions,
+		selectedQuantities,
+		selectedCount,
+		toggleSelection,
+		setSelection,
+		setQuantity,
+		getQuantity,
+		isSelected,
+		getSelected,
+		getSelectedEntries,
+		selectedAmountCent,
+		selectedProfitAmountCent,
+		getSelectedIds,
+		removeInvalid,
+		clearSelection
+	};
+});
+//#endregion
 //#region src/renderer/pages/inventory/components/InventoryTable.vue?vue&type=script&setup=true&lang.ts
 var _hoisted_1$10 = { class: "table-container" };
-var _hoisted_2$9 = { class: "table-options" };
-var _hoisted_3$6 = { class: "pagination-container" };
+var _hoisted_2$9 = {
+	key: 0,
+	class: "line-amount"
+};
+var _hoisted_3$7 = {
+	key: 1,
+	class: "empty-amount"
+};
+var _hoisted_4$6 = { class: "pagination-container" };
+var tableMaxHeight = "calc(100vh - 360px)";
 //#endregion
 //#region src/renderer/pages/inventory/components/InventoryTable.vue
 var InventoryTable_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* @__PURE__ */ defineComponent({
@@ -233,11 +356,12 @@ var InventoryTable_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* 
 		"deleteProduct",
 		"pageChange",
 		"sizeChange",
-		"selectionChange"
+		"quantityChange"
 	],
 	setup(__props, { emit: __emit }) {
 		const props = __props;
 		const emit = __emit;
+		const selectionStore = useSelectionStore();
 		const currentPage = computed({
 			get: () => props.page,
 			set: () => {}
@@ -246,11 +370,12 @@ var InventoryTable_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* 
 			get: () => props.pageSize,
 			set: () => {}
 		});
-		const showTaxCode = ref(true);
-		const tableMaxHeight = ref(550);
-		function handleSelectionChange(selectedRows) {
-			const selectedIds = new Set(selectedRows.map((r) => r.priceVersionId));
-			for (const row of props.rows) emit("selectionChange", row, selectedIds.has(row.priceVersionId));
+		function handleQuantityChange(row, quantity) {
+			emit("quantityChange", row, quantity ?? 0);
+		}
+		/** 计算主表中当前行未加利润的已选金额。 */
+		function selectedLineAmount(row) {
+			return centToDisplay(calcOutboundAmountCent(selectionStore.getQuantity(row.priceVersionId), row.unitPriceDecimal, "1"));
 		}
 		function stockTagType(balance) {
 			if (balance > 0) return "success";
@@ -268,220 +393,172 @@ var InventoryTable_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* 
 			}
 		}
 		return (_ctx, _cache) => {
-			const _component_ElCheckbox = ElCheckbox;
+			const _component_ElInputNumber = ElInputNumber;
 			const _component_ElTableColumn = ElTableColumn;
 			const _component_ElTag = ElTag;
 			const _component_ElButton = ElButton;
 			const _component_ElTable = ElTable;
 			const _component_ElPagination = ElPagination;
 			const _directive_loading = vLoading;
-			return openBlock(), createElementBlock("div", _hoisted_1$10, [
-				createBaseVNode("div", _hoisted_2$9, [createVNode(_component_ElCheckbox, {
-					modelValue: showTaxCode.value,
-					"onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => showTaxCode.value = $event)
-				}, {
-					default: withCtx(() => [..._cache[5] || (_cache[5] = [createTextVNode("显示税收分类编码列", -1)])]),
-					_: 1
-				}, 8, ["modelValue"])]),
-				withDirectives((openBlock(), createBlock(_component_ElTable, {
-					data: __props.rows,
-					border: "",
-					stripe: "",
-					size: "default",
-					"row-key": "priceVersionId",
-					"max-height": tableMaxHeight.value,
-					onSelectionChange: handleSelectionChange
-				}, {
-					default: withCtx(() => [
-						createVNode(_component_ElTableColumn, {
-							type: "selection",
-							width: "50",
-							"reserve-selection": true
-						}),
-						createVNode(_component_ElTableColumn, {
-							prop: "name",
-							label: "项目名称",
-							"min-width": "180",
-							"show-overflow-tooltip": ""
-						}),
-						createVNode(_component_ElTableColumn, {
-							prop: "model",
-							label: "型号",
-							width: "120",
-							"show-overflow-tooltip": ""
-						}),
-						createVNode(_component_ElTableColumn, {
-							prop: "unit",
-							label: "单位",
-							width: "80"
-						}),
-						showTaxCode.value ? (openBlock(), createBlock(_component_ElTableColumn, {
-							key: 0,
-							prop: "taxClassificationCode",
-							label: "税收分类编码",
-							"min-width": "150",
-							"show-overflow-tooltip": ""
-						})) : createCommentVNode("", true),
-						createVNode(_component_ElTableColumn, {
-							prop: "unitPriceDecimal",
-							label: "含税单价",
-							width: "130"
-						}),
-						createVNode(_component_ElTableColumn, {
-							label: "当前库存",
-							width: "120"
+			return openBlock(), createElementBlock("div", _hoisted_1$10, [withDirectives((openBlock(), createBlock(_component_ElTable, {
+				data: __props.rows,
+				border: "",
+				stripe: "",
+				size: "large",
+				"row-key": "priceVersionId",
+				"max-height": tableMaxHeight,
+				class: "invoice-table"
+			}, {
+				default: withCtx(() => [
+					createVNode(_component_ElTableColumn, {
+						label: "开票数量",
+						width: "128",
+						fixed: "left",
+						align: "center",
+						"class-name": "quantity-column"
+					}, {
+						default: withCtx(({ row }) => [createVNode(_component_ElInputNumber, {
+							"model-value": unref(selectionStore).getQuantity(row.priceVersionId),
+							min: 0,
+							step: 1,
+							precision: 0,
+							size: "small",
+							class: "quantity-stepper",
+							onChange: ($event) => handleQuantityChange(row, $event)
+						}, null, 8, ["model-value", "onChange"])]),
+						_: 1
+					}),
+					createVNode(_component_ElTableColumn, {
+						prop: "name",
+						label: "商品 / 项目名称",
+						"min-width": "220",
+						"show-overflow-tooltip": ""
+					}),
+					createVNode(_component_ElTableColumn, {
+						prop: "model",
+						label: "规格型号",
+						"min-width": "140",
+						"show-overflow-tooltip": ""
+					}),
+					createVNode(_component_ElTableColumn, {
+						prop: "unit",
+						label: "单位",
+						width: "80"
+					}),
+					createVNode(_component_ElTableColumn, {
+						prop: "unitPriceDecimal",
+						label: "含税单价（元）",
+						width: "140",
+						align: "right"
+					}, {
+						default: withCtx(({ row }) => [createTextVNode("¥" + toDisplayString(row.unitPriceDecimal), 1)]),
+						_: 1
+					}),
+					createVNode(_component_ElTableColumn, {
+						label: "本行已选金额",
+						width: "150",
+						align: "right"
+					}, {
+						default: withCtx(({ row }) => [unref(selectionStore).getQuantity(row.priceVersionId) > 0 ? (openBlock(), createElementBlock("strong", _hoisted_2$9, " ¥" + toDisplayString(selectedLineAmount(row)), 1)) : (openBlock(), createElementBlock("span", _hoisted_3$7, "—"))]),
+						_: 1
+					}),
+					createVNode(_component_ElTableColumn, {
+						label: "当前库存",
+						width: "120"
+					}, {
+						default: withCtx(({ row }) => [createVNode(_component_ElTag, {
+							type: stockTagType(row.stockBalance),
+							size: "small"
 						}, {
-							default: withCtx(({ row }) => [createVNode(_component_ElTag, {
-								type: stockTagType(row.stockBalance),
-								size: "small"
+							default: withCtx(() => [createTextVNode(toDisplayString(stockStatusText(row.stockBalance)), 1)]),
+							_: 2
+						}, 1032, ["type"])]),
+						_: 1
+					}),
+					createVNode(_component_ElTableColumn, {
+						prop: "updatedAt",
+						label: "最近变更",
+						width: "160"
+					}, {
+						default: withCtx(({ row }) => [createTextVNode(toDisplayString(formatTime(row.updatedAt)), 1)]),
+						_: 1
+					}),
+					createVNode(_component_ElTableColumn, {
+						label: "商品操作",
+						width: "270",
+						fixed: "right"
+					}, {
+						default: withCtx(({ row }) => [
+							createVNode(_component_ElButton, {
+								link: "",
+								type: "info",
+								size: "small",
+								onClick: ($event) => _ctx.$emit("viewHistory", row)
 							}, {
-								default: withCtx(() => [createTextVNode(toDisplayString(stockStatusText(row.stockBalance)), 1)]),
-								_: 2
-							}, 1032, ["type"])]),
-							_: 1
-						}),
-						createVNode(_component_ElTableColumn, {
-							prop: "updatedAt",
-							label: "最近变更",
-							width: "160"
-						}, {
-							default: withCtx(({ row }) => [createTextVNode(toDisplayString(formatTime(row.updatedAt)), 1)]),
-							_: 1
-						}),
-						createVNode(_component_ElTableColumn, {
-							label: "操作",
-							width: "270",
-							fixed: "right"
-						}, {
-							default: withCtx(({ row }) => [
-								createVNode(_component_ElButton, {
-									link: "",
-									type: "info",
-									size: "small",
-									onClick: ($event) => _ctx.$emit("viewHistory", row)
-								}, {
-									default: withCtx(() => [..._cache[6] || (_cache[6] = [createTextVNode("历史记录", -1)])]),
-									_: 1
-								}, 8, ["onClick"]),
-								createVNode(_component_ElButton, {
-									link: "",
-									type: "primary",
-									size: "small",
-									onClick: ($event) => _ctx.$emit("editProduct", row)
-								}, {
-									default: withCtx(() => [..._cache[7] || (_cache[7] = [createTextVNode("编辑", -1)])]),
-									_: 1
-								}, 8, ["onClick"]),
-								createVNode(_component_ElButton, {
-									link: "",
-									type: "primary",
-									size: "small",
-									onClick: ($event) => _ctx.$emit("adjustStock", row)
-								}, {
-									default: withCtx(() => [..._cache[8] || (_cache[8] = [createTextVNode("库存调整", -1)])]),
-									_: 1
-								}, 8, ["onClick"]),
-								createVNode(_component_ElButton, {
-									link: "",
-									type: "danger",
-									size: "small",
-									onClick: ($event) => _ctx.$emit("deleteProduct", row)
-								}, {
-									default: withCtx(() => [..._cache[9] || (_cache[9] = [createTextVNode("删除", -1)])]),
-									_: 1
-								}, 8, ["onClick"])
-							]),
-							_: 1
-						})
-					]),
-					_: 1
-				}, 8, ["data", "max-height"])), [[_directive_loading, __props.loading]]),
-				createBaseVNode("div", _hoisted_3$6, [createVNode(_component_ElPagination, {
-					"current-page": currentPage.value,
-					"onUpdate:currentPage": _cache[1] || (_cache[1] = ($event) => currentPage.value = $event),
-					"page-size": currentPageSize.value,
-					"onUpdate:pageSize": _cache[2] || (_cache[2] = ($event) => currentPageSize.value = $event),
-					total: __props.total,
-					"page-sizes": [
-						20,
-						50,
-						100
-					],
-					layout: "total, sizes, prev, pager, next, jumper",
-					onCurrentChange: _cache[3] || (_cache[3] = ($event) => _ctx.$emit("pageChange", $event)),
-					onSizeChange: _cache[4] || (_cache[4] = ($event) => _ctx.$emit("sizeChange", $event))
-				}, null, 8, [
-					"current-page",
-					"page-size",
-					"total"
-				])])
-			]);
+								default: withCtx(() => [..._cache[4] || (_cache[4] = [createTextVNode("历史记录", -1)])]),
+								_: 1
+							}, 8, ["onClick"]),
+							createVNode(_component_ElButton, {
+								link: "",
+								type: "primary",
+								size: "small",
+								onClick: ($event) => _ctx.$emit("editProduct", row)
+							}, {
+								default: withCtx(() => [..._cache[5] || (_cache[5] = [createTextVNode("编辑", -1)])]),
+								_: 1
+							}, 8, ["onClick"]),
+							createVNode(_component_ElButton, {
+								link: "",
+								type: "primary",
+								size: "small",
+								onClick: ($event) => _ctx.$emit("adjustStock", row)
+							}, {
+								default: withCtx(() => [..._cache[6] || (_cache[6] = [createTextVNode("库存调整", -1)])]),
+								_: 1
+							}, 8, ["onClick"]),
+							createVNode(_component_ElButton, {
+								link: "",
+								type: "danger",
+								size: "small",
+								onClick: ($event) => _ctx.$emit("deleteProduct", row)
+							}, {
+								default: withCtx(() => [..._cache[7] || (_cache[7] = [createTextVNode("删除", -1)])]),
+								_: 1
+							}, 8, ["onClick"])
+						]),
+						_: 1
+					})
+				]),
+				_: 1
+			}, 8, ["data"])), [[_directive_loading, __props.loading]]), createBaseVNode("div", _hoisted_4$6, [createVNode(_component_ElPagination, {
+				"current-page": currentPage.value,
+				"onUpdate:currentPage": _cache[0] || (_cache[0] = ($event) => currentPage.value = $event),
+				"page-size": currentPageSize.value,
+				"onUpdate:pageSize": _cache[1] || (_cache[1] = ($event) => currentPageSize.value = $event),
+				total: __props.total,
+				"page-sizes": [
+					20,
+					50,
+					100
+				],
+				layout: "total, sizes, prev, pager, next, jumper",
+				onCurrentChange: _cache[2] || (_cache[2] = ($event) => _ctx.$emit("pageChange", $event)),
+				onSizeChange: _cache[3] || (_cache[3] = ($event) => _ctx.$emit("sizeChange", $event))
+			}, null, 8, [
+				"current-page",
+				"page-size",
+				"total"
+			])])]);
 		};
 	}
-}), [["__scopeId", "data-v-c01890cb"]]);
-//#endregion
-//#region src/renderer/stores/selection.ts
-/**
-* 页面二跨分页选择 Store。
-* 以 priceVersionId 为键保存跨页选择；翻页、改变每页数量和改变筛选条件只更新当前页数据，不清空 Store。
-* 离开 /inventory 或开票成功后清空，取消开票 Dialog 时保留。
-*/
-var useSelectionStore = defineStore("selection", () => {
-	const selectedPriceVersions = ref(/* @__PURE__ */ new Map());
-	/** 获取已选数量 */
-	function selectedCount() {
-		return selectedPriceVersions.value.size;
-	}
-	/** 切换勾选 */
-	function toggleSelection(row, selected) {
-		if (selected) selectedPriceVersions.value.set(row.priceVersionId, row);
-		else selectedPriceVersions.value.delete(row.priceVersionId);
-		selectedPriceVersions.value = new Map(selectedPriceVersions.value);
-	}
-	/** 批量设置勾选 */
-	function setSelection(rows, selected) {
-		if (selected) for (const row of rows) selectedPriceVersions.value.set(row.priceVersionId, row);
-		else for (const row of rows) selectedPriceVersions.value.delete(row.priceVersionId);
-		selectedPriceVersions.value = new Map(selectedPriceVersions.value);
-	}
-	/** 检查是否已选 */
-	function isSelected(priceVersionId) {
-		return selectedPriceVersions.value.has(priceVersionId);
-	}
-	/** 获取全部已选 */
-	function getSelected() {
-		return Array.from(selectedPriceVersions.value.values());
-	}
-	/** 获取全部已选 ID */
-	function getSelectedIds() {
-		return Array.from(selectedPriceVersions.value.keys());
-	}
-	/** 从已选中移除失效项 */
-	function removeInvalid(ids) {
-		for (const id of ids) selectedPriceVersions.value.delete(id);
-		selectedPriceVersions.value = new Map(selectedPriceVersions.value);
-	}
-	/** 清空已选 */
-	function clearSelection() {
-		selectedPriceVersions.value = /* @__PURE__ */ new Map();
-	}
-	return {
-		selectedPriceVersions,
-		selectedCount,
-		toggleSelection,
-		setSelection,
-		isSelected,
-		getSelected,
-		getSelectedIds,
-		removeInvalid,
-		clearSelection
-	};
-});
+}), [["__scopeId", "data-v-260aa3ae"]]);
 //#endregion
 //#region src/renderer/pages/inventory/modals/OutboundLineTable.vue?vue&type=script&setup=true&lang.ts
 var _hoisted_1$9 = { class: "line-table-container" };
-var _hoisted_2$8 = { class: "summary-bar" };
-var _hoisted_3$5 = { class: "total" };
+var _hoisted_2$8 = { class: "line-table-tools" };
+var _hoisted_3$6 = { key: 0 };
+var _hoisted_4$5 = { class: "summary-bar" };
+var _hoisted_5$4 = { class: "total" };
 //#endregion
 //#region src/renderer/pages/inventory/modals/OutboundLineTable.vue
 var OutboundLineTable_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* @__PURE__ */ defineComponent({
@@ -491,114 +568,180 @@ var OutboundLineTable_default = /*#__PURE__*/ _plugin_vue_export_helper_default(
 		factor: {}
 	},
 	emits: ["change", "remove"],
-	setup(__props) {
+	setup(__props, { emit: __emit }) {
 		const props = __props;
-		/** 单行金额（分）= 含税单价 × 数量 × 系数 */
+		const emit = __emit;
+		/** 读取用户输入的单行最终金额，非法输入按 0 参与临时汇总。 */
 		function lineAmount(row) {
-			return calcOutboundAmountCent(row.quantity, row.unitPriceDecimal, props.factor);
+			try {
+				return yuanToCent(row.amountYuan);
+			} catch {
+				return 0;
+			}
 		}
 		const totalQuantity = computed(() => props.lines.reduce((sum, l) => sum + l.quantity, 0));
 		const totalAmountCent = computed(() => props.lines.reduce((sum, l) => sum + lineAmount(l), 0));
+		const fractionalLineCount = computed(() => props.lines.filter((line) => lineAmount(line) % 100 !== 0).length);
+		/** 数量变化后按当前金额系数重新生成该行金额。 */
+		function handleQuantityChange(row) {
+			row.amountYuan = centToYuan(calcOutboundAmountCent(row.quantity, row.unitPriceDecimal, props.factor));
+			emit("change");
+		}
+		/** 失焦时校验并规范化金额为两位小数。 */
+		function normalizeLineAmount(row) {
+			try {
+				const amountCent = yuanToCent(row.amountYuan);
+				if (amountCent <= 0) throw new Error("金额必须大于 0");
+				row.amountYuan = centToYuan(amountCent);
+			} catch {
+				row.amountYuan = centToYuan(calcOutboundAmountCent(row.quantity, row.unitPriceDecimal, props.factor));
+				ElMessage.warning(`“${row.name}”金额无效，已恢复为自动计算金额`);
+			}
+			emit("change");
+		}
+		/** 将当前弹窗内所有带角分的行金额四舍五入到整数元。 */
+		function roundAllFractionalAmounts() {
+			let roundedCount = 0;
+			for (const line of props.lines) {
+				const amountCent = lineAmount(line);
+				if (amountCent % 100 === 0) continue;
+				line.amountYuan = centToYuan(roundCentToWholeYuan(amountCent));
+				roundedCount += 1;
+			}
+			emit("change");
+			ElMessage.success(`已四舍五入 ${roundedCount} 行金额`);
+		}
 		function stockTagType(balance) {
 			if (balance > 0) return "success";
 			if (balance < 0) return "danger";
 			return "info";
 		}
 		return (_ctx, _cache) => {
+			const _component_ElButton = ElButton;
 			const _component_ElTableColumn = ElTableColumn;
 			const _component_ElTag = ElTag;
 			const _component_ElInputNumber = ElInputNumber;
-			const _component_ElButton = ElButton;
+			const _component_ElInput = ElInput;
 			const _component_ElTable = ElTable;
-			return openBlock(), createElementBlock("div", _hoisted_1$9, [createVNode(_component_ElTable, {
-				data: __props.lines,
-				border: "",
-				stripe: "",
-				size: "small",
-				"max-height": "400"
-			}, {
-				default: withCtx(() => [
-					createVNode(_component_ElTableColumn, {
-						prop: "name",
-						label: "项目名称",
-						"min-width": "150"
-					}),
-					createVNode(_component_ElTableColumn, {
-						prop: "model",
-						label: "型号",
-						width: "100"
-					}),
-					createVNode(_component_ElTableColumn, {
-						prop: "unit",
-						label: "单位",
-						width: "70"
-					}),
-					createVNode(_component_ElTableColumn, {
-						prop: "unitPriceDecimal",
-						label: "含税单价",
-						width: "120"
-					}),
-					createVNode(_component_ElTableColumn, {
-						label: "当前库存",
-						width: "100"
-					}, {
-						default: withCtx(({ row }) => [createVNode(_component_ElTag, {
-							type: stockTagType(row.stockBalance),
-							size: "small"
+			return openBlock(), createElementBlock("div", _hoisted_1$9, [
+				createBaseVNode("div", _hoisted_2$8, [_cache[2] || (_cache[2] = createBaseVNode("div", null, [createBaseVNode("strong", null, "开票明细"), createBaseVNode("span", null, "金额可直接编辑，修改数量后会按当前系数重新计算")], -1)), createVNode(_component_ElButton, {
+					type: "warning",
+					plain: "",
+					disabled: fractionalLineCount.value === 0,
+					onClick: roundAllFractionalAmounts
+				}, {
+					default: withCtx(() => [_cache[1] || (_cache[1] = createTextVNode(" 一键四舍五入金额 ", -1)), fractionalLineCount.value > 0 ? (openBlock(), createElementBlock("span", _hoisted_3$6, "（" + toDisplayString(fractionalLineCount.value) + " 行）", 1)) : createCommentVNode("", true)]),
+					_: 1
+				}, 8, ["disabled"])]),
+				createVNode(_component_ElTable, {
+					data: __props.lines,
+					border: "",
+					stripe: "",
+					size: "default",
+					"max-height": "440"
+				}, {
+					default: withCtx(() => [
+						createVNode(_component_ElTableColumn, {
+							prop: "name",
+							label: "项目名称",
+							"min-width": "170"
+						}),
+						createVNode(_component_ElTableColumn, {
+							prop: "model",
+							label: "型号",
+							width: "100"
+						}),
+						createVNode(_component_ElTableColumn, {
+							prop: "unit",
+							label: "单位",
+							width: "70"
+						}),
+						createVNode(_component_ElTableColumn, {
+							prop: "unitPriceDecimal",
+							label: "含税单价",
+							width: "120"
+						}),
+						createVNode(_component_ElTableColumn, {
+							label: "当前库存",
+							width: "100"
 						}, {
-							default: withCtx(() => [createTextVNode(toDisplayString(row.stockBalance), 1)]),
-							_: 2
-						}, 1032, ["type"])]),
-						_: 1
-					}),
-					createVNode(_component_ElTableColumn, {
-						label: "数量",
-						width: "140"
-					}, {
-						default: withCtx(({ row }) => [createVNode(_component_ElInputNumber, {
-							modelValue: row.quantity,
-							"onUpdate:modelValue": ($event) => row.quantity = $event,
-							min: 1,
-							step: 1,
-							precision: 0,
-							size: "small",
-							onChange: _cache[0] || (_cache[0] = ($event) => _ctx.$emit("change"))
-						}, null, 8, ["modelValue", "onUpdate:modelValue"])]),
-						_: 1
-					}),
-					createVNode(_component_ElTableColumn, {
-						label: "金额",
-						width: "120"
-					}, {
-						default: withCtx(({ row }) => [createTextVNode(toDisplayString(unref(centToDisplay)(lineAmount(row))), 1)]),
-						_: 1
-					}),
-					createVNode(_component_ElTableColumn, {
-						label: "操作",
-						width: "80",
-						fixed: "right"
-					}, {
-						default: withCtx(({ $index }) => [createVNode(_component_ElButton, {
-							link: "",
-							type: "danger",
-							size: "small",
-							onClick: ($event) => _ctx.$emit("remove", $index)
-						}, {
-							default: withCtx(() => [..._cache[1] || (_cache[1] = [createTextVNode("移除", -1)])]),
+							default: withCtx(({ row }) => [createVNode(_component_ElTag, {
+								type: stockTagType(row.stockBalance),
+								size: "small"
+							}, {
+								default: withCtx(() => [createTextVNode(toDisplayString(row.stockBalance), 1)]),
+								_: 2
+							}, 1032, ["type"])]),
 							_: 1
-						}, 8, ["onClick"])]),
-						_: 1
-					})
-				]),
-				_: 1
-			}, 8, ["data"]), createBaseVNode("div", _hoisted_2$8, [
-				createBaseVNode("span", null, "行数：" + toDisplayString(__props.lines.length), 1),
-				createBaseVNode("span", null, "数量合计：" + toDisplayString(totalQuantity.value), 1),
-				createBaseVNode("span", _hoisted_3$5, "金额：" + toDisplayString(unref(centToDisplay)(totalAmountCent.value)), 1)
-			])]);
+						}),
+						createVNode(_component_ElTableColumn, {
+							label: "数量",
+							width: "140"
+						}, {
+							default: withCtx(({ row }) => [createVNode(_component_ElInputNumber, {
+								modelValue: row.quantity,
+								"onUpdate:modelValue": ($event) => row.quantity = $event,
+								min: 1,
+								step: 1,
+								precision: 0,
+								size: "small",
+								onChange: ($event) => handleQuantityChange(row)
+							}, null, 8, [
+								"modelValue",
+								"onUpdate:modelValue",
+								"onChange"
+							])]),
+							_: 1
+						}),
+						createVNode(_component_ElTableColumn, {
+							label: "开票金额（元）",
+							width: "180"
+						}, {
+							default: withCtx(({ row }) => [createVNode(_component_ElInput, {
+								modelValue: row.amountYuan,
+								"onUpdate:modelValue": ($event) => row.amountYuan = $event,
+								inputmode: "decimal",
+								class: "amount-input",
+								onBlur: ($event) => normalizeLineAmount(row),
+								onChange: _cache[0] || (_cache[0] = ($event) => _ctx.$emit("change"))
+							}, {
+								prefix: withCtx(() => [..._cache[3] || (_cache[3] = [createTextVNode("¥", -1)])]),
+								_: 1
+							}, 8, [
+								"modelValue",
+								"onUpdate:modelValue",
+								"onBlur"
+							])]),
+							_: 1
+						}),
+						createVNode(_component_ElTableColumn, {
+							label: "操作",
+							width: "80",
+							fixed: "right"
+						}, {
+							default: withCtx(({ $index }) => [createVNode(_component_ElButton, {
+								link: "",
+								type: "danger",
+								size: "small",
+								onClick: ($event) => _ctx.$emit("remove", $index)
+							}, {
+								default: withCtx(() => [..._cache[4] || (_cache[4] = [createTextVNode("移除", -1)])]),
+								_: 1
+							}, 8, ["onClick"])]),
+							_: 1
+						})
+					]),
+					_: 1
+				}, 8, ["data"]),
+				createBaseVNode("div", _hoisted_4$5, [
+					createBaseVNode("span", null, "行数：" + toDisplayString(__props.lines.length), 1),
+					createBaseVNode("span", null, "数量合计：" + toDisplayString(totalQuantity.value), 1),
+					createBaseVNode("span", _hoisted_5$4, "金额：" + toDisplayString(unref(centToDisplay)(totalAmountCent.value)), 1)
+				])
+			]);
 		};
 	}
-}), [["__scopeId", "data-v-25ad2562"]]);
+}), [["__scopeId", "data-v-270073e6"]]);
 //#endregion
 //#region src/renderer/pages/inventory/modals/OutboundExportDialog.vue?vue&type=script&setup=true&lang.ts
 var _hoisted_1$8 = { class: "outbound-content" };
@@ -628,15 +771,19 @@ var OutboundExportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_defau
 		watch(() => props.visible, (val) => {
 			if (val) {
 				lines.length = 0;
-				for (const pv of props.initialLines) lines.push({
-					priceVersionId: pv.priceVersionId,
-					name: pv.name,
-					model: pv.model,
-					unit: pv.unit,
-					unitPriceDecimal: pv.unitPriceDecimal,
-					stockBalance: pv.stockBalance,
-					quantity: 1
-				});
+				for (const item of props.initialLines) {
+					const pv = item.row;
+					lines.push({
+						priceVersionId: pv.priceVersionId,
+						name: pv.name,
+						model: pv.model,
+						unit: pv.unit,
+						unitPriceDecimal: pv.unitPriceDecimal,
+						stockBalance: pv.stockBalance,
+						quantity: item.quantity,
+						amountYuan: centToYuan(calcOutboundAmountCent(item.quantity, pv.unitPriceDecimal, amountFactor.value))
+					});
+				}
 				loadCustomers();
 			}
 		}, { immediate: true });
@@ -671,6 +818,22 @@ var OutboundExportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_defau
 			lines.splice(index, 1);
 		}
 		function recalculate() {}
+		/** 统一系数变化时重新计算弹窗内全部行金额。 */
+		function handleFactorChange() {
+			try {
+				for (const line of lines) line.amountYuan = centToYuan(calcOutboundAmountCent(line.quantity, line.unitPriceDecimal, amountFactor.value));
+			} catch {
+				amountFactor.value = "1.09";
+				for (const line of lines) line.amountYuan = centToYuan(calcOutboundAmountCent(line.quantity, line.unitPriceDecimal, "1.09"));
+				ElMessage.warning("金额系数无效，已恢复为 1.09");
+			}
+		}
+		/** 将弹窗中的金额字符串转换为后端使用的整数分。 */
+		function parseLineAmountCent(line) {
+			const amountCent = yuanToCent(line.amountYuan);
+			if (amountCent <= 0) throw new Error(`“${line.name}”的金额必须大于 0`);
+			return amountCent;
+		}
 		async function handleExport() {
 			if (lines.length > 2e3) {
 				ElMessage.error("单次最多 2000 条明细");
@@ -682,7 +845,8 @@ var OutboundExportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_defau
 					customerId: selectedCustomerId.value,
 					lines: lines.map((l) => ({
 						priceVersionId: l.priceVersionId,
-						quantity: l.quantity
+						quantity: l.quantity,
+						amountCent: parseLineAmountCent(l)
 					})),
 					amountFactor: amountFactor.value
 				};
@@ -696,7 +860,8 @@ var OutboundExportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_defau
 					}
 					input.lines = draft.validLines.map((l) => ({
 						priceVersionId: l.priceVersionId,
-						quantity: l.quantity
+						quantity: l.quantity,
+						amountCent: l.amountCent
 					}));
 				}
 				const result = await api.outbound.export(input);
@@ -777,7 +942,8 @@ var OutboundExportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_defau
 							modelValue: amountFactor.value,
 							"onUpdate:modelValue": _cache[1] || (_cache[1] = ($event) => amountFactor.value = $event),
 							style: { "width": "120px" },
-							placeholder: "1.09"
+							placeholder: "1.09",
+							onChange: handleFactorChange
 						}, null, 8, ["modelValue"])]),
 						_: 1
 					})]),
@@ -792,7 +958,7 @@ var OutboundExportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_defau
 			}, 8, ["modelValue"]);
 		};
 	}
-}), [["__scopeId", "data-v-43033b8f"]]);
+}), [["__scopeId", "data-v-1ce32b3e"]]);
 //#endregion
 //#region src/renderer/pages/inventory/modals/PriceVersionList.vue?vue&type=script&setup=true&lang.ts
 var _hoisted_1$7 = { class: "price-versions" };
@@ -1097,7 +1263,7 @@ var _hoisted_1$6 = {
 	class: "history-header"
 };
 var _hoisted_2$6 = { class: "pagination-container" };
-var _hoisted_3$4 = { class: "pagination-container" };
+var _hoisted_3$5 = { class: "pagination-container" };
 //#endregion
 //#region src/renderer/pages/inventory/modals/HistoryRecordDialog.vue
 var HistoryRecordDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* @__PURE__ */ defineComponent({
@@ -1426,7 +1592,7 @@ var HistoryRecordDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_defaul
 								})
 							]),
 							_: 1
-						}, 8, ["data"])), [[_directive_loading, fieldLoading.value]]), createBaseVNode("div", _hoisted_3$4, [createVNode(_component_ElPagination, {
+						}, 8, ["data"])), [[_directive_loading, fieldLoading.value]]), createBaseVNode("div", _hoisted_3$5, [createVNode(_component_ElPagination, {
 							"current-page": fieldPage.value,
 							"onUpdate:currentPage": _cache[2] || (_cache[2] = ($event) => fieldPage.value = $event),
 							"page-size": fieldPageSize.value,
@@ -1685,12 +1851,12 @@ var _hoisted_2$4 = {
 	key: 0,
 	class: "step-content"
 };
-var _hoisted_3$3 = { class: "file-actions" };
-var _hoisted_4$3 = {
+var _hoisted_3$4 = { class: "file-actions" };
+var _hoisted_4$4 = {
 	key: 1,
 	class: "step-content"
 };
-var _hoisted_5$2 = { class: "preview-summary" };
+var _hoisted_5$3 = { class: "preview-summary" };
 var _hoisted_6$2 = { class: "error-text" };
 //#endregion
 //#region src/renderer/pages/inventory/modals/CatalogInitialImportDialog.vue
@@ -1802,7 +1968,7 @@ var CatalogInitialImportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper
 				}, {
 					default: withCtx(() => [..._cache[2] || (_cache[2] = [createTextVNode(" 下载系统模板，填写商品、型号、单位、税收分类编码、含税单价和初始库存。初始库存允许正数、0 或负数。 ", -1)])]),
 					_: 1
-				}), createBaseVNode("div", _hoisted_3$3, [createVNode(_component_ElButton, { onClick: handleDownloadTemplate }, {
+				}), createBaseVNode("div", _hoisted_3$4, [createVNode(_component_ElButton, { onClick: handleDownloadTemplate }, {
 					default: withCtx(() => [..._cache[3] || (_cache[3] = [createTextVNode("下载模板", -1)])]),
 					_: 1
 				}), createVNode(_component_ElButton, {
@@ -1812,8 +1978,8 @@ var CatalogInitialImportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper
 				}, {
 					default: withCtx(() => [..._cache[4] || (_cache[4] = [createTextVNode("选择文件", -1)])]),
 					_: 1
-				}, 8, ["loading"])])])) : step.value === "preview" ? (openBlock(), createElementBlock("div", _hoisted_4$3, [
-					createBaseVNode("div", _hoisted_5$2, [
+				}, 8, ["loading"])])])) : step.value === "preview" ? (openBlock(), createElementBlock("div", _hoisted_4$4, [
+					createBaseVNode("div", _hoisted_5$3, [
 						createVNode(_component_ElTag, { type: "success" }, {
 							default: withCtx(() => [createTextVNode("新增商品 " + toDisplayString(preview.value?.newProductCount) + " 个", 1)]),
 							_: 1
@@ -1929,12 +2095,12 @@ var _hoisted_2$3 = {
 	key: 0,
 	class: "step-content"
 };
-var _hoisted_3$2 = { class: "file-actions" };
-var _hoisted_4$2 = {
+var _hoisted_3$3 = { class: "file-actions" };
+var _hoisted_4$3 = {
 	key: 1,
 	class: "step-content"
 };
-var _hoisted_5$1 = { class: "preview-summary" };
+var _hoisted_5$2 = { class: "preview-summary" };
 var _hoisted_6$1 = { class: "error-text" };
 //#endregion
 //#region src/renderer/pages/inventory/modals/CatalogDailyImportDialog.vue
@@ -2046,7 +2212,7 @@ var CatalogDailyImportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_d
 				}, {
 					default: withCtx(() => [..._cache[2] || (_cache[2] = [createTextVNode(" 日常导入只新增商品或价格版本，不修改库存。已有商品的单位或税收分类编码不一致时整批失败。 ", -1)])]),
 					_: 1
-				}), createBaseVNode("div", _hoisted_3$2, [createVNode(_component_ElButton, { onClick: handleDownloadTemplate }, {
+				}), createBaseVNode("div", _hoisted_3$3, [createVNode(_component_ElButton, { onClick: handleDownloadTemplate }, {
 					default: withCtx(() => [..._cache[3] || (_cache[3] = [createTextVNode("下载模板", -1)])]),
 					_: 1
 				}), createVNode(_component_ElButton, {
@@ -2056,8 +2222,8 @@ var CatalogDailyImportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_d
 				}, {
 					default: withCtx(() => [..._cache[4] || (_cache[4] = [createTextVNode("选择文件", -1)])]),
 					_: 1
-				}, 8, ["loading"])])])) : step.value === "preview" ? (openBlock(), createElementBlock("div", _hoisted_4$2, [
-					createBaseVNode("div", _hoisted_5$1, [
+				}, 8, ["loading"])])])) : step.value === "preview" ? (openBlock(), createElementBlock("div", _hoisted_4$3, [
+					createBaseVNode("div", _hoisted_5$2, [
 						createVNode(_component_ElTag, { type: "success" }, {
 							default: withCtx(() => [createTextVNode("新增商品 " + toDisplayString(preview.value?.newProductCount) + " 个", 1)]),
 							_: 1
@@ -2161,11 +2327,11 @@ var CatalogDailyImportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_d
 //#region src/renderer/pages/inventory/modals/ReplenishmentExportDialog.vue?vue&type=script&setup=true&lang.ts
 var _hoisted_1$2 = { class: "export-content" };
 var _hoisted_2$2 = { class: "toolbar" };
-var _hoisted_3$1 = {
+var _hoisted_3$2 = {
 	key: 0,
 	class: "summary-bar"
 };
-var _hoisted_4$1 = { class: "total" };
+var _hoisted_4$2 = { class: "total" };
 //#endregion
 //#region src/renderer/pages/inventory/modals/ReplenishmentExportDialog.vue
 var ReplenishmentExportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* @__PURE__ */ defineComponent({
@@ -2342,12 +2508,12 @@ var ReplenishmentExportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_
 						]),
 						_: 1
 					}, 8, ["data"])), [[_directive_loading, previewing.value]]),
-					preview.value && preview.value.lines.length > 0 ? (openBlock(), createElementBlock("div", _hoisted_3$1, [
+					preview.value && preview.value.lines.length > 0 ? (openBlock(), createElementBlock("div", _hoisted_3$2, [
 						createBaseVNode("span", null, "待补行数：" + toDisplayString(preview.value.lines.length), 1),
 						createBaseVNode("span", null, "数量合计：" + toDisplayString(totalQuantity.value), 1),
 						createBaseVNode("span", null, "金额：" + toDisplayString(unref(centToDisplay)(totalAmountCent.value)), 1),
 						createBaseVNode("span", null, "税额：" + toDisplayString(unref(centToDisplay)(totalTaxCent.value)), 1),
-						createBaseVNode("span", _hoisted_4$1, "价税合计：" + toDisplayString(unref(centToDisplay)(totalCent.value)), 1)
+						createBaseVNode("span", _hoisted_4$2, "价税合计：" + toDisplayString(unref(centToDisplay)(totalCent.value)), 1)
 					])) : createCommentVNode("", true)
 				])]),
 				_: 1
@@ -2362,12 +2528,12 @@ var _hoisted_2$1 = {
 	key: 0,
 	class: "step-content"
 };
-var _hoisted_3 = { class: "file-actions" };
-var _hoisted_4 = {
+var _hoisted_3$1 = { class: "file-actions" };
+var _hoisted_4$1 = {
 	key: 1,
 	class: "step-content"
 };
-var _hoisted_5 = { class: "preview-summary" };
+var _hoisted_5$1 = { class: "preview-summary" };
 var _hoisted_6 = { class: "error-text" };
 //#endregion
 //#region src/renderer/pages/inventory/modals/InboundImportDialog.vue
@@ -2491,7 +2657,7 @@ var InboundImportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_defaul
 				}, {
 					default: withCtx(() => [..._cache[3] || (_cache[3] = [createTextVNode(" 请下载系统模板，填写总部进项明细后上传。系统会计算文件哈希和标准化内容哈希，重复导入将被阻止。 ", -1)])]),
 					_: 1
-				}), createBaseVNode("div", _hoisted_3, [createVNode(_component_ElButton, {
+				}), createBaseVNode("div", _hoisted_3$1, [createVNode(_component_ElButton, {
 					loading: downloading.value,
 					onClick: handleDownloadTemplate
 				}, {
@@ -2504,8 +2670,8 @@ var InboundImportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_defaul
 				}, {
 					default: withCtx(() => [..._cache[5] || (_cache[5] = [createTextVNode("选择文件", -1)])]),
 					_: 1
-				}, 8, ["loading"])])])) : step.value === "preview" ? (openBlock(), createElementBlock("div", _hoisted_4, [
-					createBaseVNode("div", _hoisted_5, [
+				}, 8, ["loading"])])])) : step.value === "preview" ? (openBlock(), createElementBlock("div", _hoisted_4$1, [
+					createBaseVNode("div", _hoisted_5$1, [
 						createVNode(_component_ElTag, { type: "success" }, {
 							default: withCtx(() => [createTextVNode("有效行 " + toDisplayString(validLineCount.value), 1)]),
 							_: 1
@@ -2958,85 +3124,6 @@ var ImportRecordsDialog_default = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region src/renderer/pages/inventory/modals/SelectedItemsDialog.vue
-var SelectedItemsDialog_default = /* @__PURE__ */ defineComponent({
-	__name: "SelectedItemsDialog",
-	props: { modelValue: { type: Boolean } },
-	emits: ["update:modelValue", "clear"],
-	setup(__props, { emit: __emit }) {
-		const props = __props;
-		const emit = __emit;
-		const selectionStore = useSelectionStore();
-		const visible = computed({
-			get: () => props.modelValue,
-			set: (val) => emit("update:modelValue", val)
-		});
-		function handleClear() {
-			emit("clear");
-			visible.value = false;
-		}
-		return (_ctx, _cache) => {
-			const _component_ElTableColumn = ElTableColumn;
-			const _component_ElTable = ElTable;
-			const _component_ElButton = ElButton;
-			const _component_ElDialog = ElDialog;
-			return openBlock(), createBlock(_component_ElDialog, {
-				modelValue: visible.value,
-				"onUpdate:modelValue": _cache[1] || (_cache[1] = ($event) => visible.value = $event),
-				title: "已选价格版本",
-				width: "700px"
-			}, {
-				footer: withCtx(() => [createVNode(_component_ElButton, { onClick: _cache[0] || (_cache[0] = ($event) => visible.value = false) }, {
-					default: withCtx(() => [..._cache[2] || (_cache[2] = [createTextVNode("关闭", -1)])]),
-					_: 1
-				}), createVNode(_component_ElButton, {
-					type: "danger",
-					onClick: handleClear
-				}, {
-					default: withCtx(() => [..._cache[3] || (_cache[3] = [createTextVNode("清空已选", -1)])]),
-					_: 1
-				})]),
-				default: withCtx(() => [createVNode(_component_ElTable, {
-					data: unref(selectionStore).getSelected(),
-					border: "",
-					size: "small",
-					"max-height": "400"
-				}, {
-					default: withCtx(() => [
-						createVNode(_component_ElTableColumn, {
-							prop: "name",
-							label: "项目名称",
-							"min-width": "150"
-						}),
-						createVNode(_component_ElTableColumn, {
-							prop: "model",
-							label: "型号",
-							width: "120"
-						}),
-						createVNode(_component_ElTableColumn, {
-							prop: "unit",
-							label: "单位",
-							width: "80"
-						}),
-						createVNode(_component_ElTableColumn, {
-							prop: "unitPriceDecimal",
-							label: "含税单价",
-							width: "120"
-						}),
-						createVNode(_component_ElTableColumn, {
-							prop: "stockBalance",
-							label: "库存",
-							width: "80"
-						})
-					]),
-					_: 1
-				}, 8, ["data"])]),
-				_: 1
-			}, 8, ["modelValue"]);
-		};
-	}
-});
-//#endregion
 //#region src/renderer/pages/inventory/useInventoryPage.ts
 /**
 * InventoryPage 状态和逻辑 composable。
@@ -3048,7 +3135,6 @@ function useInventoryPage() {
 	const loading = ref(false);
 	const rows = ref([]);
 	const total = ref(0);
-	const showSelected = ref(false);
 	const query = reactive({
 		name: "",
 		model: "",
@@ -3104,13 +3190,13 @@ function useInventoryPage() {
 		query.page = 1;
 		loadData();
 	}
-	function handleSelectionChange(row, selected) {
-		selectionStore.toggleSelection(row, selected);
+	function handleQuantityChange(row, quantity) {
+		selectionStore.setQuantity(row, quantity);
 	}
 	function handleOutbound() {
-		const selected = selectionStore.getSelected();
+		const selected = selectionStore.getSelectedEntries();
 		if (selected.length === 0) {
-			ElMessage.warning("请先勾选价格版本");
+			ElMessage.warning("请先在商品左侧增加开票数量");
 			return;
 		}
 		outboundLines.value = selected;
@@ -3136,7 +3222,7 @@ function useInventoryPage() {
 		const selected = selectionStore.getSelected();
 		if (selected.length > 0) historyPriceVersionId.value = selected[0].priceVersionId;
 		else {
-			ElMessage.info("请先勾选价格版本，或在行操作中点击\"历史记录\"");
+			ElMessage.info("请先设置一项开票数量，或在行操作中点击“历史记录”");
 			return;
 		}
 		modalType.value = "history";
@@ -3153,7 +3239,6 @@ function useInventoryPage() {
 	}
 	function handleClearSelection() {
 		selectionStore.clearSelection();
-		showSelected.value = false;
 	}
 	function handleImportSuccess() {
 		initialImportVisible.value = false;
@@ -3168,7 +3253,6 @@ function useInventoryPage() {
 		loading,
 		rows,
 		total,
-		showSelected,
 		query,
 		modalType,
 		editingProductId,
@@ -3185,7 +3269,7 @@ function useInventoryPage() {
 		handleReset,
 		handlePageChange,
 		handleSizeChange,
-		handleSelectionChange,
+		handleQuantityChange,
 		handleOutbound,
 		handleAddProduct,
 		handleEditProduct,
@@ -3216,12 +3300,15 @@ function useInventoryPage() {
 //#region src/renderer/pages/inventory/InventoryPage.vue?vue&type=script&setup=true&lang.ts
 var _hoisted_1 = { class: "content-card" };
 var _hoisted_2 = { class: "selection-bar" };
+var _hoisted_3 = { class: "selection-metric" };
+var _hoisted_4 = { class: "selection-metric" };
+var _hoisted_5 = { class: "selection-metric profit" };
 //#endregion
 //#region src/renderer/pages/inventory/InventoryPage.vue
 var InventoryPage_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* @__PURE__ */ defineComponent({
 	__name: "InventoryPage",
 	setup(__props) {
-		const { selectionStore, loading, rows, total, showSelected, query, modalType, editingProductId, historyPriceVersionId, adjustPriceVersionId, outboundLines, initialImportVisible, dailyImportVisible, replenishmentVisible, inboundVisible, importRecordsVisible, loadData, handleSearch, handleReset, handlePageChange, handleSizeChange, handleSelectionChange, handleOutbound, handleAddProduct, handleEditProduct, handleViewHistory, handleAdjustStock, handleViewHistoryGlobal, handleDeleteProduct, handleClearSelection, handleImportSuccess, handleInitialImport, handleDailyImport, handleMonthEndExport, handleMonthBeginningImport, handleImportRecords } = useInventoryPage();
+		const { selectionStore, loading, rows, total, query, modalType, editingProductId, historyPriceVersionId, adjustPriceVersionId, outboundLines, initialImportVisible, dailyImportVisible, replenishmentVisible, inboundVisible, importRecordsVisible, loadData, handleSearch, handleReset, handlePageChange, handleSizeChange, handleQuantityChange, handleOutbound, handleAddProduct, handleEditProduct, handleViewHistory, handleAdjustStock, handleViewHistoryGlobal, handleDeleteProduct, handleClearSelection, handleImportSuccess, handleInitialImport, handleDailyImport, handleMonthEndExport, handleMonthBeginningImport, handleImportRecords } = useInventoryPage();
 		return (_ctx, _cache) => {
 			const _component_ElButton = ElButton;
 			return openBlock(), createElementBlock("div", _hoisted_1, [
@@ -3260,25 +3347,23 @@ var InventoryPage_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* @
 					"onViewHistory"
 				]),
 				createBaseVNode("div", _hoisted_2, [
-					createBaseVNode("span", null, "已选 " + toDisplayString(unref(selectionStore).selectedCount()) + " 项", 1),
-					createVNode(_component_ElButton, {
-						link: "",
-						type: "primary",
-						size: "small",
-						onClick: _cache[3] || (_cache[3] = ($event) => showSelected.value = true)
-					}, {
-						default: withCtx(() => [..._cache[11] || (_cache[11] = [createTextVNode("查看已选", -1)])]),
-						_: 1
-					}),
+					createBaseVNode("div", _hoisted_3, [
+						_cache[9] || (_cache[9] = createBaseVNode("span", { class: "metric-label" }, "已选", -1)),
+						createBaseVNode("strong", null, toDisplayString(unref(selectionStore).selectedCount()), 1),
+						_cache[10] || (_cache[10] = createBaseVNode("span", null, "项", -1))
+					]),
+					createBaseVNode("div", _hoisted_4, [_cache[11] || (_cache[11] = createBaseVNode("span", { class: "metric-label" }, "已选总金额", -1)), createBaseVNode("strong", null, "¥" + toDisplayString(unref(centToDisplay)(unref(selectionStore).selectedAmountCent())), 1)]),
+					createBaseVNode("div", _hoisted_5, [_cache[12] || (_cache[12] = createBaseVNode("span", { class: "metric-label" }, "加利润总金额（×1.09）", -1)), createBaseVNode("strong", null, "¥" + toDisplayString(unref(centToDisplay)(unref(selectionStore).selectedProfitAmountCent())), 1)]),
 					createVNode(_component_ElButton, {
 						link: "",
 						type: "danger",
 						size: "small",
+						disabled: unref(selectionStore).selectedCount() === 0,
 						onClick: unref(handleClearSelection)
 					}, {
-						default: withCtx(() => [..._cache[12] || (_cache[12] = [createTextVNode("清空已选", -1)])]),
+						default: withCtx(() => [..._cache[13] || (_cache[13] = [createTextVNode(" 清空 ", -1)])]),
 						_: 1
-					}, 8, ["onClick"])
+					}, 8, ["disabled", "onClick"])
 				]),
 				createVNode(InventoryTable_default, {
 					rows: unref(rows),
@@ -3292,7 +3377,7 @@ var InventoryPage_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* @
 					onDeleteProduct: unref(handleDeleteProduct),
 					onPageChange: unref(handlePageChange),
 					onSizeChange: unref(handleSizeChange),
-					onSelectionChange: unref(handleSelectionChange)
+					onQuantityChange: unref(handleQuantityChange)
 				}, null, 8, [
 					"rows",
 					"loading",
@@ -3305,11 +3390,11 @@ var InventoryPage_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* @
 					"onDeleteProduct",
 					"onPageChange",
 					"onSizeChange",
-					"onSelectionChange"
+					"onQuantityChange"
 				]),
 				createVNode(InventoryModalHost_default, {
 					"modal-type": unref(modalType),
-					"onUpdate:modalType": _cache[4] || (_cache[4] = ($event) => isRef(modalType) ? modalType.value = $event : null),
+					"onUpdate:modalType": _cache[3] || (_cache[3] = ($event) => isRef(modalType) ? modalType.value = $event : null),
 					"editing-product-id": unref(editingProductId),
 					"history-price-version-id": unref(historyPriceVersionId),
 					"adjust-price-version-id": unref(adjustPriceVersionId),
@@ -3325,36 +3410,31 @@ var InventoryPage_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* @
 				]),
 				createVNode(CatalogInitialImportDialog_default, {
 					visible: unref(initialImportVisible),
-					"onUpdate:visible": _cache[5] || (_cache[5] = ($event) => isRef(initialImportVisible) ? initialImportVisible.value = $event : null),
+					"onUpdate:visible": _cache[4] || (_cache[4] = ($event) => isRef(initialImportVisible) ? initialImportVisible.value = $event : null),
 					onSuccess: unref(handleImportSuccess)
 				}, null, 8, ["visible", "onSuccess"]),
 				createVNode(CatalogDailyImportDialog_default, {
 					visible: unref(dailyImportVisible),
-					"onUpdate:visible": _cache[6] || (_cache[6] = ($event) => isRef(dailyImportVisible) ? dailyImportVisible.value = $event : null),
+					"onUpdate:visible": _cache[5] || (_cache[5] = ($event) => isRef(dailyImportVisible) ? dailyImportVisible.value = $event : null),
 					onSuccess: unref(handleImportSuccess)
 				}, null, 8, ["visible", "onSuccess"]),
 				createVNode(ReplenishmentExportDialog_default, {
 					visible: unref(replenishmentVisible),
-					"onUpdate:visible": _cache[7] || (_cache[7] = ($event) => isRef(replenishmentVisible) ? replenishmentVisible.value = $event : null),
+					"onUpdate:visible": _cache[6] || (_cache[6] = ($event) => isRef(replenishmentVisible) ? replenishmentVisible.value = $event : null),
 					onSuccess: unref(loadData)
 				}, null, 8, ["visible", "onSuccess"]),
 				createVNode(InboundImportDialog_default, {
 					visible: unref(inboundVisible),
-					"onUpdate:visible": _cache[8] || (_cache[8] = ($event) => isRef(inboundVisible) ? inboundVisible.value = $event : null),
+					"onUpdate:visible": _cache[7] || (_cache[7] = ($event) => isRef(inboundVisible) ? inboundVisible.value = $event : null),
 					onSuccess: unref(loadData)
 				}, null, 8, ["visible", "onSuccess"]),
 				createVNode(ImportRecordsDialog_default, {
 					visible: unref(importRecordsVisible),
-					"onUpdate:visible": _cache[9] || (_cache[9] = ($event) => isRef(importRecordsVisible) ? importRecordsVisible.value = $event : null)
-				}, null, 8, ["visible"]),
-				createVNode(SelectedItemsDialog_default, {
-					modelValue: unref(showSelected),
-					"onUpdate:modelValue": _cache[10] || (_cache[10] = ($event) => isRef(showSelected) ? showSelected.value = $event : null),
-					onClear: unref(handleClearSelection)
-				}, null, 8, ["modelValue", "onClear"])
+					"onUpdate:visible": _cache[8] || (_cache[8] = ($event) => isRef(importRecordsVisible) ? importRecordsVisible.value = $event : null)
+				}, null, 8, ["visible"])
 			]);
 		};
 	}
-}), [["__scopeId", "data-v-03373a28"]]);
+}), [["__scopeId", "data-v-39ad85e1"]]);
 //#endregion
 export { InventoryPage_default as default };

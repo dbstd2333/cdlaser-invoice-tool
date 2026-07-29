@@ -17,9 +17,22 @@
       @view-history="handleViewHistoryGlobal"
     />
     <div class="selection-bar">
-      <span>已选 {{ selectionStore.selectedCount() }} 项</span>
-      <ElButton link type="primary" size="small" @click="showSelected = true">查看已选</ElButton>
-      <ElButton link type="danger" size="small" @click="handleClearSelection">清空已选</ElButton>
+      <div class="selection-metric">
+        <span class="metric-label">已选</span>
+        <strong>{{ selectionStore.selectedCount() }}</strong>
+        <span>项</span>
+      </div>
+      <div class="selection-metric">
+        <span class="metric-label">已选总金额</span>
+        <strong>¥{{ centToDisplay(selectionStore.selectedAmountCent()) }}</strong>
+      </div>
+      <div class="selection-metric profit">
+        <span class="metric-label">加利润总金额（×1.09）</span>
+        <strong>¥{{ centToDisplay(selectionStore.selectedProfitAmountCent()) }}</strong>
+      </div>
+      <ElButton link type="danger" size="small" :disabled="selectionStore.selectedCount() === 0" @click="handleClearSelection">
+        清空
+      </ElButton>
     </div>
     <InventoryTable
       :rows="rows"
@@ -33,7 +46,7 @@
       @delete-product="handleDeleteProduct"
       @page-change="handlePageChange"
       @size-change="handleSizeChange"
-      @selection-change="handleSelectionChange"
+      @quantity-change="handleQuantityChange"
     />
     <InventoryModalHost
       v-model:modal-type="modalType"
@@ -62,8 +75,6 @@
     <ImportRecordsDialog
       v-model:visible="importRecordsVisible"
     />
-
-    <SelectedItemsDialog v-model="showSelected" @clear="handleClearSelection" />
   </div>
 </template>
 
@@ -76,15 +87,15 @@ import CatalogDailyImportDialog from './modals/CatalogDailyImportDialog.vue';
 import ReplenishmentExportDialog from './modals/ReplenishmentExportDialog.vue';
 import InboundImportDialog from './modals/InboundImportDialog.vue';
 import ImportRecordsDialog from './modals/ImportRecordsDialog.vue';
-import SelectedItemsDialog from './modals/SelectedItemsDialog.vue';
 import { useInventoryPage } from './useInventoryPage';
+import { centToDisplay } from '@shared/money';
 
 const {
-  selectionStore, loading, rows, total, showSelected,
+  selectionStore, loading, rows, total,
   query, modalType, editingProductId, historyPriceVersionId, adjustPriceVersionId, outboundLines,
   initialImportVisible, dailyImportVisible, replenishmentVisible, inboundVisible, importRecordsVisible,
   loadData, handleSearch, handleReset, handlePageChange, handleSizeChange,
-  handleSelectionChange, handleOutbound, handleAddProduct, handleEditProduct,
+  handleQuantityChange, handleOutbound, handleAddProduct, handleEditProduct,
   handleViewHistory, handleAdjustStock, handleViewHistoryGlobal,
   handleDeleteProduct, handleClearSelection, handleImportSuccess,
   handleInitialImport, handleDailyImport, handleMonthEndExport, handleMonthBeginningImport, handleImportRecords,
@@ -95,9 +106,42 @@ const {
 .selection-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 0;
+  gap: 8px;
+  min-height: 50px;
+  margin: 0 0 10px;
+  padding: 8px 12px;
   font-size: 14px;
   color: var(--text-regular);
+  background: #f7f9fc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid var(--el-color-primary);
+  border-radius: 6px;
+}
+
+.selection-metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 4px 12px;
+  border-right: 1px solid #dfe5ec;
+}
+
+.selection-metric strong {
+  color: #17233d;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.selection-metric.profit strong {
+  color: #b45309;
+}
+
+.metric-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.selection-bar .el-button {
+  margin-left: auto;
 }
 </style>

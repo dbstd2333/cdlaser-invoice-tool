@@ -80,6 +80,28 @@ export function calcOutboundAmountCent(
   return rounded.times(100).round().toNumber();
 }
 
+/** 金额（分）乘系数并四舍五入到整数分。 */
+export function scaleAmountCent(amountCent: number, factor: string | number): number {
+  return new Decimal(amountCent).times(new Decimal(factor)).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber();
+}
+
+/** 最终金额（分）按数量反推每件开票单价，保留 13 位小数。 */
+export function amountCentToUnitPrice(amountCent: number, quantity: number): string {
+  if (!Number.isInteger(amountCent) || amountCent <= 0) throw new Error('金额必须为正整数分');
+  if (!Number.isInteger(quantity) || quantity <= 0) throw new Error('数量必须为正整数');
+  return new Decimal(amountCent).div(100).div(quantity)
+    .toDecimalPlaces(UNIT_PRICE_MAX_DECIMALS, Decimal.ROUND_HALF_UP)
+    .toString();
+}
+
+/** 将带角分的金额四舍五入到整数元，返回整数分。 */
+export function roundCentToWholeYuan(amountCent: number): number {
+  return new Decimal(amountCent).div(100)
+    .toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
+    .times(100)
+    .toNumber();
+}
+
 /** 单价 × 系数（保留 13 位小数），用于销项导出「商品单价」列 = 含税单价 × 系数 */
 export function scaleUnitPrice(unitPrice: string | number | Decimal, factor: string | number): string {
   return new Decimal(String(unitPrice)).times(new Decimal(factor)).toDecimalPlaces(UNIT_PRICE_MAX_DECIMALS, Decimal.ROUND_HALF_UP).toString();

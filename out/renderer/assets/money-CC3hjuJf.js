@@ -1998,9 +1998,21 @@ var OUTBOUND_AMOUNT_FACTOR = "1.09";
 function calcOutboundAmountCent(quantity, taxInclusiveUnitPrice, factor = OUTBOUND_AMOUNT_FACTOR) {
 	return new Decimal(quantity).times(new Decimal(taxInclusiveUnitPrice)).times(new Decimal(factor)).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).times(100).round().toNumber();
 }
+/** 金额（分）乘系数并四舍五入到整数分。 */
+function scaleAmountCent(amountCent, factor) {
+	return new Decimal(amountCent).times(new Decimal(factor)).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber();
+}
+/** 将带角分的金额四舍五入到整数元，返回整数分。 */
+function roundCentToWholeYuan(amountCent) {
+	return new Decimal(amountCent).div(100).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).times(100).toNumber();
+}
 /** 将分转换为元字符串，保留 2 位小数 */
 function centToYuan(cent) {
 	return new Decimal(cent).div(100).toFixed(2);
+}
+/** 将元字符串转换为分整数 */
+function yuanToCent(yuan) {
+	return new Decimal(yuan).times(100).round().toNumber();
 }
 /**
 * 金额分 -> 千分位显示字符串（元），如 1234567 -> "12,345.67"
@@ -2011,4 +2023,4 @@ function centToDisplay(cent) {
 	return decPart ? `${formattedInt}.${decPart}` : `${formattedInt}.00`;
 }
 //#endregion
-export { centToDisplay as n, calcOutboundAmountCent as t };
+export { scaleAmountCent as a, roundCentToWholeYuan as i, centToDisplay as n, yuanToCent as o, centToYuan as r, calcOutboundAmountCent as t };
