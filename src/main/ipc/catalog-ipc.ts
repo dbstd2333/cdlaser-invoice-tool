@@ -12,9 +12,8 @@ import {
   getProductById,
   createProduct,
   updateProduct,
-  toggleProductStatus,
+  deleteProduct,
   createPriceVersion,
-  togglePriceVersionStatus,
   getPriceVersionsByIds,
 } from '../domains/catalog/catalog-service';
 import {
@@ -49,16 +48,12 @@ export function registerCatalogIpc(): void {
     return updateProduct(input);
   });
 
-  registerHandler(IPC_CHANNELS.catalog.toggleProductStatus, null, (id: string) => {
-    return toggleProductStatus(id);
-  });
-
   registerHandler(IPC_CHANNELS.catalog.createPriceVersion, priceVersionCreateSchema, (input) => {
     return createPriceVersion(input);
   });
 
-  registerHandler(IPC_CHANNELS.catalog.togglePriceVersionStatus, null, (id: string) => {
-    return togglePriceVersionStatus(id);
+  registerHandler(IPC_CHANNELS.catalog.deleteProduct, null, (id: string) => {
+    return deleteProduct(id);
   });
 
   // 商品首次导入预览

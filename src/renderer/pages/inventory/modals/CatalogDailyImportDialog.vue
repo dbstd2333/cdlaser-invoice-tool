@@ -35,7 +35,7 @@
           <ElTableColumn prop="model" label="型号" width="100" />
           <ElTableColumn prop="unit" label="单位" width="70" />
           <ElTableColumn prop="taxClassificationCode" label="税收编码" min-width="130" />
-          <ElTableColumn prop="unitPriceDecimal" label="单价" width="110" />
+          <ElTableColumn prop="unitPriceDecimal" label="含税单价" width="110" />
           <ElTableColumn label="状态" width="80">
             <template #default="{ row }">
               <ElTag :type="row.deduped ? 'warning' : row.errors.length > 0 ? 'danger' : 'success'" size="small">

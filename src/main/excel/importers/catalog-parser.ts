@@ -19,7 +19,7 @@ export async function parseCatalogExcel(filePath: string, isInitial: boolean): P
     model: findColumnIndex(headerRow, ['规格型号', '型号', 'model']),
     unit: findColumnIndex(headerRow, ['单位', 'unit']),
     taxCode: findColumnIndex(headerRow, ['税收分类编码', '税收编码', 'tax_code']),
-    price: findColumnIndex(headerRow, ['不含税单价', '单价', 'unit_price']),
+    price: findColumnIndex(headerRow, ['含税单价', '单价', 'unit_price']),
     stock: findColumnIndex(headerRow, ['初始库存', '库存', 'stock']),
     remark: findColumnIndex(headerRow, ['备注', 'remark']),
   };

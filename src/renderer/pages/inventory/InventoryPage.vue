@@ -1,9 +1,9 @@
 <template>
   <div class="content-card">
     <InventoryToolbar
-      v-model:keyword="query.keyword"
+      v-model:name="query.name"
+      v-model:model="query.model"
       v-model:stock-status="query.stockStatus"
-      v-model:product-status="query.productStatus"
       @search="handleSearch"
       @reset="handleReset"
       @refresh="loadData"
@@ -29,9 +29,8 @@
       :total="total"
       @view-history="handleViewHistory"
       @edit-product="handleEditProduct"
-      @toggle-product-status="handleToggleProductStatus"
-      @toggle-price-version-status="handleTogglePriceVersionStatus"
       @adjust-stock="handleAdjustStock"
+      @delete-product="handleDeleteProduct"
       @page-change="handlePageChange"
       @size-change="handleSizeChange"
       @selection-change="handleSelectionChange"
@@ -87,7 +86,7 @@ const {
   loadData, handleSearch, handleReset, handlePageChange, handleSizeChange,
   handleSelectionChange, handleOutbound, handleAddProduct, handleEditProduct,
   handleViewHistory, handleAdjustStock, handleViewHistoryGlobal,
-  handleToggleProductStatus, handleTogglePriceVersionStatus, handleClearSelection, handleImportSuccess,
+  handleDeleteProduct, handleClearSelection, handleImportSuccess,
   handleInitialImport, handleDailyImport, handleMonthEndExport, handleMonthBeginningImport, handleImportRecords,
 } = useInventoryPage();
 </script>

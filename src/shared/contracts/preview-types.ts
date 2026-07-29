@@ -161,16 +161,13 @@ export interface BackupHistoryItem {
   checksumStatus: 'verified' | 'unknown';
 }
 
-export interface S3Config {
-  serviceType: 'aws' | 'compatible';
-  endpoint?: string;
+export interface CosConfig {
   region: string;
   bucket: string;
   prefix?: string;
-  accessKeyId?: string;
-  secretAccessKey?: string;
-  sessionToken?: string;
-  pathStyle: boolean;
+  secretId?: string;
+  secretKey?: string;
+  securityToken?: string;
   autoBackup: boolean;
   retentionCount: number;
   restorePassword?: string;

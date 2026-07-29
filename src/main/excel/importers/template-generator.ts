@@ -38,7 +38,7 @@ export async function generateCatalogTemplate(savePath: string, isInitial: boole
     { header: '规格型号', key: 'model', width: 20 },
     { header: '单位', key: 'unit', width: 10 },
     { header: '税收分类编码', key: 'taxCode', width: 20 },
-    { header: '不含税单价', key: 'price', width: 15 },
+    { header: '含税单价', key: 'price', width: 15 },
   ];
   if (isInitial) {
     columns.push({ header: '初始库存', key: 'stock', width: 12 });
@@ -64,7 +64,7 @@ export async function generateInboundTemplate(savePath: string): Promise<void> {
     { header: '规格型号', key: 'model', width: 20 },
     { header: '单位', key: 'unit', width: 10 },
     { header: '数量', key: 'quantity', width: 12 },
-    { header: '不含税单价', key: 'unitPrice', width: 16 },
+    { header: '含税单价', key: 'unitPrice', width: 16 },
     { header: '不含税金额', key: 'amount', width: 16 },
     { header: '税额', key: 'tax', width: 14 },
     { header: '价税合计', key: 'total', width: 16 },

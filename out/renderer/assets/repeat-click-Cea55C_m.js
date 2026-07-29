@@ -1,4 +1,4 @@
-import { Ra as isFunction } from "./css-DpRyt22U.js";
+import { Ra as isFunction } from "./css-C8sLGSMG.js";
 //#region node_modules/element-plus/es/directives/repeat-click/index.mjs
 var SCOPE = "_RepeatClick";
 var vRepeatClick = {

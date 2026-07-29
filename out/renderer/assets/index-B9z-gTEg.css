@@ -55,7 +55,7 @@
   color: var(--color-negative);
 }
 
-.hint[data-v-f8675f23] {
+.hint[data-v-33b9d88d] {
   margin-left: 8px;
   color: var(--text-secondary);
   font-size: 12px;
@@ -80,20 +80,20 @@
   margin: 4px 0;
 }
 
-.s3-panel[data-v-7299a7ff] {
+.cos-panel[data-v-67fc0f10] {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
-.action-buttons[data-v-7299a7ff] {
+.action-buttons[data-v-67fc0f10] {
   display: flex;
   gap: 12px;
 }
 
-.diagnostics-card[data-v-51cfd4f0] {
+.diagnostics-card[data-v-191dd59c] {
   margin-top: 20px;
 }
-.hint[data-v-51cfd4f0] {
+.hint[data-v-191dd59c] {
   margin-left: 12px;
   color: var(--text-secondary);
   font-size: 12px;

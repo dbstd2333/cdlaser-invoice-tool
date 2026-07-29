@@ -43,7 +43,7 @@ function createWindow(): void {
     minWidth: 1024,
     minHeight: 720,
     show: false,
-    title: '发票库存管理系统',
+    title: '成都莱盛发票库存管理工具',
     webPreferences: {
       preload: resolve(__dirname, '../preload/index.js'),
       contextIsolation: true,

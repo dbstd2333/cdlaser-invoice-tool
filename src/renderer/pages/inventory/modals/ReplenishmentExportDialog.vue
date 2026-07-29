@@ -25,7 +25,7 @@
           </template>
         </ElTableColumn>
         <ElTableColumn prop="replenishmentQuantity" label="待补数量" width="100" />
-        <ElTableColumn prop="unitPriceDecimal" label="不含税单价" width="120" />
+        <ElTableColumn prop="unitPriceDecimal" label="含税单价" width="120" />
         <ElTableColumn label="不含税金额" width="120">
           <template #default="{ row }">{{ centToDisplay(row.amountCent) }}</template>
         </ElTableColumn>

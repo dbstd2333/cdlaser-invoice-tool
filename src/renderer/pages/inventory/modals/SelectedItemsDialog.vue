@@ -4,7 +4,7 @@
       <ElTableColumn prop="name" label="项目名称" min-width="150" />
       <ElTableColumn prop="model" label="型号" width="120" />
       <ElTableColumn prop="unit" label="单位" width="80" />
-      <ElTableColumn prop="unitPriceDecimal" label="单价" width="120" />
+      <ElTableColumn prop="unitPriceDecimal" label="含税单价" width="120" />
       <ElTableColumn prop="stockBalance" label="库存" width="80" />
     </ElTable>
     <template #footer>

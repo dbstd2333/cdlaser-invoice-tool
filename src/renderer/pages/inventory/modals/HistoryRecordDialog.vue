@@ -141,7 +141,7 @@ const fieldLoaded = ref(false);
 const FIELD_LABELS: Record<string, string> = {
   status: '启用状态',
   stockBalance: '库存余额',
-  unitPriceDecimal: '不含税单价',
+  unitPriceDecimal: '含税单价',
   name: '项目名称',
   model: '规格型号',
   unit: '单位',

@@ -1,9 +1,9 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./CustomersPage-CwN7Ia5X.js","./css-DpRyt22U.js","./css-DOSB4dvV.css","./css-ZZEPHGOo.js","./css-DQbQPkSq.css","./css-CQ8KhwB9.js","./css-DMizI1kg.css","./css-6gC5bciY.js","./css-VfGHan3u.css","./CustomersPage--w4Eu6vd.css","./InventoryPage-6ghWDp8b.js","./css-_jBveQ-o.js","./repeat-click-BKnwesSQ.js","./css-CZu_mLr_.css","./money-DRED0fdN.js","./InventoryPage-Dbp20IV0.css","./OutboundRecordsPage-gBhu51K8.js","./css-BHy-No7x.js","./css-CCCYoibH.css","./OutboundRecordsPage-BGFOAeTs.css"])))=>i.map(i=>d[i]);
-import { _ as PICKER_BASE_INJECTION_KEY, a as require_customParseFormat, b as __toESM, c as buildAvailableTimeSlotGetter, d as picker_default, f as timePickerDefaultProps, g as DEFAULT_FORMATS_DATE, h as require_dayjs_min, i as require_localeData, l as useOldValue, m as rangeArr, n as ElDatePickerPanel, o as panel_time_pick_default, p as timePanelSharedProps, r as ElCard, s as basic_time_spinner_default, t as ElDatePicker, u as useTimePanel, v as PICKER_POPPER_OPTIONS_INJECTION_KEY, y as WEEK_DAYS } from "./css-BHy-No7x.js";
-import { $ as _plugin_vue_export_helper_default, $i as onDeactivated, $n as isFirefox, $r as isArrayLikeObject, $t as search_default, A as tagProps, Aa as toRefs, Ai as Fragment, An as getEventCode, Ar as useAttrs$1, At as circle_close_filled_default, B as ElBadge, Ba as isPlainObject, Bi as createVNode, Bn as cAF, Br as isElement$1, Bt as full_screen_default, C as ElOptionGroup, Ca as reactive, Ci as render, Cn as isFragment, Cr as isClient, D as useProps, Da as shallowRef, Di as withKeys, Dn as useIdInjection, Dr as useDebounceFn, Dt as circle_check_default, E as defaultProps$1, Ea as shallowReactive, Ei as vShow, En as useId, Et as check_default, F as ConfigProvider, Fa as hasOwn, Fi as createBlock, Fn as getScrollBarWidth, Fr as definePropType, Ft as delete_default, G as ElInput, Ga as normalizeStyle, Gn as addUnit, Gr as isWindow, Gt as more_default, H as isGreaterThan, Ha as isString, Hi as getCurrentInstance, Hn as useNamespace, Hr as isNumber, Ht as list_default, I as provideGlobalConfig, Ia as isArray$1, Ii as createCommentVNode, In as getScrollContainer, Ir as entriesOf, It as document_default, J as ElTooltip, Ji as mergeProps, Jn as removeClass, Jt as plus_default, K as inputProps, Ka as toDisplayString, Ki as inject, Kn as getStyle, Kr as pick, Kt as notebook_default, L as useGlobalComponentSettings, La as isDate, Li as createElementBlock, Ln as getScrollElement, Lt as download_default, M as ElButton, Mi as cloneVNode, Mn as whenMouse, Mr as throwError, Mt as close_default, N as ElButtonGroup$1, Na as unref, Ni as computed, Nn as useLockscreen, Nr as buildProp, O as selectKey, Oa as toRaw, Oi as withModifiers, On as Ee, Or as useThrottleFn, Ot as circle_check_filled_default, P as TinyColor, Pa as NOOP, Pi as createBaseVNode, Pn as animateScrollTo, Pr as buildProps, Q as focus_trap_default$1, Qi as onBeforeUpdate, Qn as isAndroid, Qr as findLastIndex, Qt as scale_to_original_default, R as useGlobalConfig, Ra as isFunction, Ri as createSlots, Rn as getScrollTop, Rr as keysOf, Rt as expand_default, S as ElOption, Si as createApp, Sr as clamp$1, St as box_default, T as selectProps, Ta as ref, Ti as vModelText, Tn as useZIndex, Tr as reactiveComputed, Tt as caret_top_default, U as BAR_MAP, Ua as normalizeClass, Ui as guardReactiveProps, Un as useLocale, Ur as isPropAbsent, Ut as loading_default, V as ElScrollbar, Va as isPromise, Vi as defineComponent, Vn as rAF, Vr as isEmpty, Vt as info_filled_default, W as scrollbarEmits, Wa as normalizeProps, Wi as h, Wn as addClass, Wr as isUndefined, X as useTooltipContentProps, Xi as onActivated, Xr as isEqual$1, Xt as refresh_left_default, Y as useTooltipTriggerProps, Yi as nextTick, Yn as setStyle, Yr as isNil, Yt as question_filled_default, Z as ElPopper, Zi as onBeforeUnmount, Zn as escapeStringRegexp, Zr as fromPairs, Zt as refresh_right_default, _ as ElDescriptions, _a as effectScope, _i as INPUT_EVENT, _n as useEmptyValuesProps, _r as useMutationObserver, _t as arrow_down_default, a as vLoading, aa as renderList, ai as Set$1, an as ticket_default, ar as triggerEvent, at as useFormDisabled, b as ElCheckboxButton, ba as isRef, bi as Transition, bn as useSizeProp, bt as arrow_up_default, c as ElTableColumn, ca as resolveDirective, ci as flatten, cn as warning_filled_default, cr as onClickOutside, ct as formItemContextKey, d as ElDialog, da as useAttrs, di as memoize, dn as withInstall, dr as useCssVar, dt as ElIcon, ea as onMounted, ei as debounce, en as setting_default, er as focusElement, et as castArray, f as composeRefs, fa as useSlots, fi as baseRest, fn as withInstallDirective, ft as CloseComponents, g as dialogProps, ga as withDirectives, gi as CHANGE_EVENT, gn as useEmptyValues, gr as useIntersectionObserver, gt as iconPropType, h as dialogEmits, ha as withCtx, hi as componentSizes, hn as useAriaProps, hr as useEventListener, ht as ValidateComponentsMap, i as ElMessage, ia as provide, in as star_filled_default, ir as isLeaf, it as useFormItemInputId, j as ClickOutside, ji as Teleport, jr as debugWarn, jt as clock_default, k as ElTag, ka as toRef, ki as Comment, kn as composeEventHandlers, kr as useTimeoutFn, kt as circle_close_default, la as resolveDynamicComponent, li as baseFlatten, ln as zoom_in_default, lr as unrefElement, lt as OnlyChild, m as ElOverlay, ma as watchEffect, mi as isObject, mn as withNoopInstall, mr as useElementSize, mt as TypeComponentsMap, n as api, na as onUpdated, ni as cacheHas, nn as sort_up_default, nr as getSibling, nt as unique, o as Loading, oa as renderSlot, oi as clamp$2, on as upload_default$1, or as useDeprecated, ot as useFormSize, p as useDialog, pa as watch, pi as baseFindIndex, pn as withInstallFunction, pr as useElementBounding, q as mutable, qa as toHandlerKey, qi as isVNode, qn as hasClass, qr as omit, qt as picture_filled_default, r as ElMessageBox, ra as openBlock, ri as SetCache, rn as star_default, rr as isFocusable, rt as useFormItem, s as ElTable, sa as resolveComponent, si as castArray$1, sn as user_default, sr as useCalcInputWidth, t as _plugin_vue_export_helper_default$1, ti as setToArray, tn as sort_down_default, tr as focusNode, u as ElPagination, ua as toHandlers, ui as get, un as zoom_out_default, ur as useActiveElement, ut as roleTypes, v as ElDescriptionsItem, vi as UPDATE_MODEL_EVENT, vn as useComposition, vr as useResizeObserver, vt as arrow_left_default, w as ElSelect, wa as readonly, wn as isValidElementNode, wr as isIOS, wt as caret_right_default, x as ElCheckboxGroup, xa as markRaw, xi as TransitionGroup, xn as flattedChildren, xr as useWindowSize, xt as back_default, y as ElCheckbox, yi as EVENT_CODE, yn as useFocusController, yr as useVModel, yt as arrow_right_default, z as buttonTypes, za as isObject$1, zi as createTextVNode, zn as scrollIntoView, zr as isBoolean, zt as fold_default } from "./css-DpRyt22U.js";
-import { a as ElForm, c as cloneDeep, i as ElRadioGroup, l as createPinia, n as ElRadio, o as ElFormItem, r as ElRadioButton, s as ElAlert, t as useAppStore, u as defineStore } from "./css-ZZEPHGOo.js";
-import { a as getOffsetTopDistance, i as getClientXY, n as ElTabs, o as useWheel, r as ElInputNumber, s as useOrderedChildren, t as ElTabPane } from "./css-_jBveQ-o.js";
-import { t as ElSwitch } from "./css-CQ8KhwB9.js";
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./CustomersPage-BYaV_vm_.js","./css-C8sLGSMG.js","./css-DOSB4dvV.css","./css-BR7T-Svb.js","./css-7Oy8rLyB.css","./css-DgJ5zyTw.js","./css-DMizI1kg.css","./css-DSzxzpYd.js","./css-VfGHan3u.css","./css-DmuVYWxe.js","./css-hV6x-LM-.css","./CustomersPage--w4Eu6vd.css","./InventoryPage-K7jtp4MA.js","./css-DRVPtfLM.js","./repeat-click-Cea55C_m.js","./css-CZu_mLr_.css","./money-DRED0fdN.js","./InventoryPage-Dbp20IV0.css","./OutboundRecordsPage-Cu16IN7z.js","./css-D6NkufY2.js","./css-CCCYoibH.css","./OutboundRecordsPage-BGFOAeTs.css"])))=>i.map(i=>d[i]);
+import { _ as PICKER_BASE_INJECTION_KEY, a as require_customParseFormat, b as __toESM, c as buildAvailableTimeSlotGetter, d as picker_default, f as timePickerDefaultProps, g as DEFAULT_FORMATS_DATE, h as require_dayjs_min, i as require_localeData, l as useOldValue, m as rangeArr, n as ElDatePickerPanel, o as panel_time_pick_default, p as timePanelSharedProps, r as ElCard, s as basic_time_spinner_default, t as ElDatePicker, u as useTimePanel, v as PICKER_POPPER_OPTIONS_INJECTION_KEY, y as WEEK_DAYS } from "./css-D6NkufY2.js";
+import { $ as _plugin_vue_export_helper_default, $i as onDeactivated, $n as isFirefox, $r as isArrayLikeObject, $t as search_default, A as tagProps, Aa as toRefs, Ai as Fragment, An as getEventCode, Ar as useAttrs$1, At as circle_close_filled_default, B as ElBadge, Ba as isPlainObject, Bi as createVNode, Bn as cAF, Br as isElement$1, Bt as full_screen_default, C as ElOptionGroup, Ca as reactive, Ci as render, Cn as isFragment, Cr as isClient, D as useProps, Da as shallowRef, Di as withKeys, Dn as useIdInjection, Dr as useDebounceFn, Dt as circle_check_default, E as defaultProps$1, Ea as shallowReactive, Ei as vShow, En as useId, Et as check_default, F as ConfigProvider, Fa as hasOwn, Fi as createBlock, Fn as getScrollBarWidth, Fr as definePropType, Ft as delete_default, G as ElInput, Ga as normalizeStyle, Gn as addUnit, Gr as isWindow, Gt as more_default, H as isGreaterThan, Ha as isString, Hi as getCurrentInstance, Hn as useNamespace, Hr as isNumber, Ht as list_default, I as provideGlobalConfig, Ia as isArray$1, Ii as createCommentVNode, In as getScrollContainer, Ir as entriesOf, It as document_default, J as ElTooltip, Ji as mergeProps, Jn as removeClass, Jt as plus_default, K as inputProps, Ka as toDisplayString, Ki as inject, Kn as getStyle, Kr as pick, Kt as notebook_default, L as useGlobalComponentSettings, La as isDate, Li as createElementBlock, Ln as getScrollElement, Lt as download_default, M as ElButton, Mi as cloneVNode, Mn as whenMouse, Mr as throwError, Mt as close_default, N as ElButtonGroup$1, Na as unref, Ni as computed, Nn as useLockscreen, Nr as buildProp, O as selectKey, Oa as toRaw, Oi as withModifiers, On as Ee, Or as useThrottleFn, Ot as circle_check_filled_default, P as TinyColor, Pa as NOOP, Pi as createBaseVNode, Pn as animateScrollTo, Pr as buildProps, Q as focus_trap_default$1, Qi as onBeforeUpdate, Qn as isAndroid, Qr as findLastIndex, Qt as scale_to_original_default, R as useGlobalConfig, Ra as isFunction, Ri as createSlots, Rn as getScrollTop, Rr as keysOf, Rt as expand_default, S as ElOption, Si as createApp, Sr as clamp$1, St as box_default, T as selectProps, Ta as ref, Ti as vModelText, Tn as useZIndex, Tr as reactiveComputed, Tt as caret_top_default, U as BAR_MAP, Ua as normalizeClass, Ui as guardReactiveProps, Un as useLocale, Ur as isPropAbsent, Ut as loading_default, V as ElScrollbar, Va as isPromise, Vi as defineComponent, Vn as rAF, Vr as isEmpty, Vt as info_filled_default, W as scrollbarEmits, Wa as normalizeProps, Wi as h, Wn as addClass, Wr as isUndefined, X as useTooltipContentProps, Xi as onActivated, Xr as isEqual$1, Xt as refresh_left_default, Y as useTooltipTriggerProps, Yi as nextTick, Yn as setStyle, Yr as isNil, Yt as question_filled_default, Z as ElPopper, Zi as onBeforeUnmount, Zn as escapeStringRegexp, Zr as fromPairs, Zt as refresh_right_default, _ as ElDescriptions, _a as effectScope, _i as INPUT_EVENT, _n as useEmptyValuesProps, _r as useMutationObserver, _t as arrow_down_default, a as vLoading, aa as renderList, ai as Set$1, an as ticket_default, ar as triggerEvent, at as useFormDisabled, b as ElCheckboxButton, ba as isRef, bi as Transition, bn as useSizeProp, bt as arrow_up_default, c as ElTableColumn, ca as resolveDirective, ci as flatten, cn as warning_filled_default, cr as onClickOutside, ct as formItemContextKey, d as ElDialog, da as useAttrs, di as memoize, dn as withInstall, dr as useCssVar, dt as ElIcon, ea as onMounted, ei as debounce, en as setting_default, er as focusElement, et as castArray, f as composeRefs, fa as useSlots, fi as baseRest, fn as withInstallDirective, ft as CloseComponents, g as dialogProps, ga as withDirectives, gi as CHANGE_EVENT, gn as useEmptyValues, gr as useIntersectionObserver, gt as iconPropType, h as dialogEmits, ha as withCtx, hi as componentSizes, hn as useAriaProps, hr as useEventListener, ht as ValidateComponentsMap, i as ElMessage, ia as provide, in as star_filled_default, ir as isLeaf, it as useFormItemInputId, j as ClickOutside, ji as Teleport, jr as debugWarn, jt as clock_default, k as ElTag, ka as toRef, ki as Comment, kn as composeEventHandlers, kr as useTimeoutFn, kt as circle_close_default, la as resolveDynamicComponent, li as baseFlatten, ln as zoom_in_default, lr as unrefElement, lt as OnlyChild, m as ElOverlay, ma as watchEffect, mi as isObject, mn as withNoopInstall, mr as useElementSize, mt as TypeComponentsMap, n as api, na as onUpdated, ni as cacheHas, nn as sort_up_default, nr as getSibling, nt as unique, o as Loading, oa as renderSlot, oi as clamp$2, on as upload_default$1, or as useDeprecated, ot as useFormSize, p as useDialog, pa as watch, pi as baseFindIndex, pn as withInstallFunction, pr as useElementBounding, q as mutable, qa as toHandlerKey, qi as isVNode, qn as hasClass, qr as omit, qt as picture_filled_default, r as ElMessageBox, ra as openBlock, ri as SetCache, rn as star_default, rr as isFocusable, rt as useFormItem, s as ElTable, sa as resolveComponent, si as castArray$1, sn as user_default, sr as useCalcInputWidth, t as _plugin_vue_export_helper_default$1, ti as setToArray, tn as sort_down_default, tr as focusNode, u as ElPagination, ua as toHandlers, ui as get, un as zoom_out_default, ur as useActiveElement, ut as roleTypes, v as ElDescriptionsItem, vi as UPDATE_MODEL_EVENT, vn as useComposition, vr as useResizeObserver, vt as arrow_left_default, w as ElSelect, wa as readonly, wn as isValidElementNode, wr as isIOS, wt as caret_right_default, x as ElCheckboxGroup, xa as markRaw, xi as TransitionGroup, xn as flattedChildren, xr as useWindowSize, xt as back_default, y as ElCheckbox, yi as EVENT_CODE, yn as useFocusController, yr as useVModel, yt as arrow_right_default, z as buttonTypes, za as isObject$1, zi as createTextVNode, zn as scrollIntoView, zr as isBoolean, zt as fold_default } from "./css-C8sLGSMG.js";
+import { a as ElForm, c as cloneDeep, i as ElRadioGroup, l as createPinia, n as ElRadio, o as ElFormItem, r as ElRadioButton, s as ElAlert, t as useAppStore, u as defineStore } from "./css-BR7T-Svb.js";
+import { a as getOffsetTopDistance, i as getClientXY, n as ElTabs, o as useWheel, r as ElInputNumber, s as useOrderedChildren, t as ElTabPane } from "./css-DRVPtfLM.js";
+import { t as ElSwitch } from "./css-DgJ5zyTw.js";
 //#region node_modules/element-plus/es/constants/key.mjs
 var INSTALLED_KEY = Symbol("INSTALLED_KEY");
 //#endregion
@@ -31270,7 +31270,7 @@ var AppHeader_default = /*#__PURE__*/ _plugin_vue_export_helper_default$1(/* @__
 	setup(__props) {
 		const appStore = useAppStore();
 		const route = useRoute();
-		const pageTitle = computed(() => route.meta.title || "发票库存管理系统");
+		const pageTitle = computed(() => route.meta.title || "成都莱盛发票库存管理工具");
 		return (_ctx, _cache) => {
 			const _component_Fold = resolveComponent("Fold");
 			const _component_Expand = resolveComponent("Expand");
@@ -31318,8 +31318,8 @@ var AppShell_default = /* @__PURE__ */ defineComponent({
 //#endregion
 //#region src/renderer/stores/backup.ts
 /**
-* 备份 Store - 管理 S3 配置、备份状态和备份历史。
-* Secret Access Key、Session Token 和恢复密码不写入持久化状态。
+* 备份 Store - 管理腾讯云 COS 配置、备份状态和备份历史。
+* SecretKey、SecurityToken 和恢复密码不写入持久化状态。
 */
 var useBackupStore = defineStore("backup", () => {
 	const status = ref({
@@ -31331,15 +31331,12 @@ var useBackupStore = defineStore("backup", () => {
 		credentialConfigured: false
 	});
 	const config = reactive({
-		serviceType: "aws",
-		endpoint: "",
 		region: "",
 		bucket: "",
 		prefix: "",
-		accessKeyId: "",
-		secretAccessKey: "",
-		sessionToken: "",
-		pathStyle: false,
+		secretId: "",
+		secretKey: "",
+		securityToken: "",
 		autoBackup: true,
 		retentionCount: 30,
 		restorePassword: ""
@@ -31356,7 +31353,7 @@ var useBackupStore = defineStore("backup", () => {
 	}
 	async function saveConfig() {
 		await api.backup.saveConfig(config);
-		credentialConfigured.value = !!(config.accessKeyId && config.secretAccessKey);
+		credentialConfigured.value = !!(config.secretId && config.secretKey);
 	}
 	async function testConnection() {
 		return api.backup.testConnection(config);
@@ -31439,9 +31436,9 @@ var BackupStatusCard_default = /*#__PURE__*/ _plugin_vue_export_helper_default$1
 	}
 }), [["__scopeId", "data-v-20411c2e"]]);
 //#endregion
-//#region src/renderer/layouts/AppShell/S3ConnectionForm.vue
-var S3ConnectionForm_default = /*#__PURE__*/ _plugin_vue_export_helper_default$1(/* @__PURE__ */ defineComponent({
-	__name: "S3ConnectionForm",
+//#region src/renderer/layouts/AppShell/CosConnectionForm.vue
+var CosConnectionForm_default = /*#__PURE__*/ _plugin_vue_export_helper_default$1(/* @__PURE__ */ defineComponent({
+	__name: "CosConnectionForm",
 	setup(__props) {
 		const backupStore = useBackupStore();
 		const testing = ref(false);
@@ -31458,112 +31455,75 @@ var S3ConnectionForm_default = /*#__PURE__*/ _plugin_vue_export_helper_default$1
 			}
 		}
 		return (_ctx, _cache) => {
-			const _component_ElRadio = ElRadio;
-			const _component_ElRadioGroup = ElRadioGroup;
-			const _component_ElFormItem = ElFormItem;
 			const _component_ElInput = ElInput;
-			const _component_ElSwitch = ElSwitch;
+			const _component_ElFormItem = ElFormItem;
 			const _component_ElButton = ElButton;
 			const _component_ElForm = ElForm;
 			const _component_ElCard = ElCard;
 			return openBlock(), createBlock(_component_ElCard, { shadow: "never" }, {
-				header: withCtx(() => [..._cache[10] || (_cache[10] = [createTextVNode("S3 连接配置", -1)])]),
+				header: withCtx(() => [..._cache[7] || (_cache[7] = [createTextVNode("腾讯云 COS 连接配置", -1)])]),
 				default: withCtx(() => [createVNode(_component_ElForm, {
 					model: unref(backupStore).config,
 					"label-width": "140px",
 					"label-position": "right"
 				}, {
 					default: withCtx(() => [
-						createVNode(_component_ElFormItem, { label: "服务类型" }, {
-							default: withCtx(() => [createVNode(_component_ElRadioGroup, {
-								modelValue: unref(backupStore).config.serviceType,
-								"onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => unref(backupStore).config.serviceType = $event)
-							}, {
-								default: withCtx(() => [createVNode(_component_ElRadio, { value: "aws" }, {
-									default: withCtx(() => [..._cache[11] || (_cache[11] = [createTextVNode("AWS S3", -1)])]),
-									_: 1
-								}), createVNode(_component_ElRadio, { value: "compatible" }, {
-									default: withCtx(() => [..._cache[12] || (_cache[12] = [createTextVNode("S3 兼容服务", -1)])]),
-									_: 1
-								})]),
-								_: 1
-							}, 8, ["modelValue"])]),
-							_: 1
-						}),
-						unref(backupStore).config.serviceType === "compatible" ? (openBlock(), createBlock(_component_ElFormItem, {
-							key: 0,
-							label: "Endpoint"
-						}, {
-							default: withCtx(() => [createVNode(_component_ElInput, {
-								modelValue: unref(backupStore).config.endpoint,
-								"onUpdate:modelValue": _cache[1] || (_cache[1] = ($event) => unref(backupStore).config.endpoint = $event),
-								placeholder: "https://s3.example.com"
-							}, null, 8, ["modelValue"])]),
-							_: 1
-						})) : createCommentVNode("", true),
 						createVNode(_component_ElFormItem, { label: "Region" }, {
 							default: withCtx(() => [createVNode(_component_ElInput, {
 								modelValue: unref(backupStore).config.region,
-								"onUpdate:modelValue": _cache[2] || (_cache[2] = ($event) => unref(backupStore).config.region = $event),
-								placeholder: "us-east-1"
+								"onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => unref(backupStore).config.region = $event),
+								placeholder: "ap-guangzhou"
 							}, null, 8, ["modelValue"])]),
 							_: 1
 						}),
 						createVNode(_component_ElFormItem, { label: "Bucket" }, {
 							default: withCtx(() => [createVNode(_component_ElInput, {
 								modelValue: unref(backupStore).config.bucket,
-								"onUpdate:modelValue": _cache[3] || (_cache[3] = ($event) => unref(backupStore).config.bucket = $event),
-								placeholder: "my-backup-bucket"
-							}, null, 8, ["modelValue"])]),
+								"onUpdate:modelValue": _cache[1] || (_cache[1] = ($event) => unref(backupStore).config.bucket = $event),
+								placeholder: "invoice-backup-1250000000"
+							}, null, 8, ["modelValue"]), _cache[8] || (_cache[8] = createBaseVNode("span", { class: "hint" }, "需包含 APPID，格式为 BucketName-APPID", -1))]),
 							_: 1
 						}),
 						createVNode(_component_ElFormItem, { label: "对象路径前缀" }, {
 							default: withCtx(() => [createVNode(_component_ElInput, {
 								modelValue: unref(backupStore).config.prefix,
-								"onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => unref(backupStore).config.prefix = $event),
+								"onUpdate:modelValue": _cache[2] || (_cache[2] = ($event) => unref(backupStore).config.prefix = $event),
 								placeholder: "invoice-backups"
 							}, null, 8, ["modelValue"])]),
 							_: 1
 						}),
-						createVNode(_component_ElFormItem, { label: "Access Key ID" }, {
+						createVNode(_component_ElFormItem, { label: "SecretId" }, {
 							default: withCtx(() => [createVNode(_component_ElInput, {
-								modelValue: unref(backupStore).config.accessKeyId,
-								"onUpdate:modelValue": _cache[5] || (_cache[5] = ($event) => unref(backupStore).config.accessKeyId = $event),
+								modelValue: unref(backupStore).config.secretId,
+								"onUpdate:modelValue": _cache[3] || (_cache[3] = ($event) => unref(backupStore).config.secretId = $event),
 								placeholder: unref(backupStore).credentialConfigured ? "已配置（不回显）" : "请输入"
 							}, null, 8, ["modelValue", "placeholder"])]),
 							_: 1
 						}),
-						createVNode(_component_ElFormItem, { label: "Secret Access Key" }, {
+						createVNode(_component_ElFormItem, { label: "SecretKey" }, {
 							default: withCtx(() => [createVNode(_component_ElInput, {
-								modelValue: unref(backupStore).config.secretAccessKey,
-								"onUpdate:modelValue": _cache[6] || (_cache[6] = ($event) => unref(backupStore).config.secretAccessKey = $event),
+								modelValue: unref(backupStore).config.secretKey,
+								"onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => unref(backupStore).config.secretKey = $event),
 								type: "password",
 								"show-password": "",
 								placeholder: unref(backupStore).credentialConfigured ? "已配置（不回显）" : "请输入"
 							}, null, 8, ["modelValue", "placeholder"])]),
 							_: 1
 						}),
-						createVNode(_component_ElFormItem, { label: "Session Token" }, {
+						createVNode(_component_ElFormItem, { label: "SecurityToken" }, {
 							default: withCtx(() => [createVNode(_component_ElInput, {
-								modelValue: unref(backupStore).config.sessionToken,
-								"onUpdate:modelValue": _cache[7] || (_cache[7] = ($event) => unref(backupStore).config.sessionToken = $event),
+								modelValue: unref(backupStore).config.securityToken,
+								"onUpdate:modelValue": _cache[5] || (_cache[5] = ($event) => unref(backupStore).config.securityToken = $event),
 								type: "password",
 								"show-password": "",
-								placeholder: "可选"
+								placeholder: "使用临时密钥时填写"
 							}, null, 8, ["modelValue"])]),
-							_: 1
-						}),
-						createVNode(_component_ElFormItem, { label: "Path Style" }, {
-							default: withCtx(() => [createVNode(_component_ElSwitch, {
-								modelValue: unref(backupStore).config.pathStyle,
-								"onUpdate:modelValue": _cache[8] || (_cache[8] = ($event) => unref(backupStore).config.pathStyle = $event)
-							}, null, 8, ["modelValue"]), _cache[13] || (_cache[13] = createBaseVNode("span", { class: "hint" }, "兼容服务可开启", -1))]),
 							_: 1
 						}),
 						createVNode(_component_ElFormItem, { label: "恢复密码" }, {
 							default: withCtx(() => [createVNode(_component_ElInput, {
 								modelValue: unref(backupStore).config.restorePassword,
-								"onUpdate:modelValue": _cache[9] || (_cache[9] = ($event) => unref(backupStore).config.restorePassword = $event),
+								"onUpdate:modelValue": _cache[6] || (_cache[6] = ($event) => unref(backupStore).config.restorePassword = $event),
 								type: "password",
 								"show-password": "",
 								placeholder: "用于备份文件加密"
@@ -31575,7 +31535,7 @@ var S3ConnectionForm_default = /*#__PURE__*/ _plugin_vue_export_helper_default$1
 								loading: testing.value,
 								onClick: handleTest
 							}, {
-								default: withCtx(() => [..._cache[14] || (_cache[14] = [createTextVNode("测试连接", -1)])]),
+								default: withCtx(() => [..._cache[9] || (_cache[9] = [createTextVNode("测试连接", -1)])]),
 								_: 1
 							}, 8, ["loading"])]),
 							_: 1
@@ -31587,7 +31547,7 @@ var S3ConnectionForm_default = /*#__PURE__*/ _plugin_vue_export_helper_default$1
 			});
 		};
 	}
-}), [["__scopeId", "data-v-f8675f23"]]);
+}), [["__scopeId", "data-v-33b9d88d"]]);
 //#endregion
 //#region src/renderer/layouts/AppShell/BackupPolicyForm.vue
 var BackupPolicyForm_default = /*#__PURE__*/ _plugin_vue_export_helper_default$1(/* @__PURE__ */ defineComponent({
@@ -31861,13 +31821,13 @@ var RestoreBackupDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_defaul
 	}
 }), [["__scopeId", "data-v-157bce08"]]);
 //#endregion
-//#region src/renderer/layouts/AppShell/S3BackupPanel.vue?vue&type=script&setup=true&lang.ts
-var _hoisted_1 = { class: "s3-panel" };
+//#region src/renderer/layouts/AppShell/CosBackupPanel.vue?vue&type=script&setup=true&lang.ts
+var _hoisted_1 = { class: "cos-panel" };
 var _hoisted_2 = { class: "action-buttons" };
 //#endregion
-//#region src/renderer/layouts/AppShell/S3BackupPanel.vue
-var S3BackupPanel_default = /*#__PURE__*/ _plugin_vue_export_helper_default$1(/* @__PURE__ */ defineComponent({
-	__name: "S3BackupPanel",
+//#region src/renderer/layouts/AppShell/CosBackupPanel.vue
+var CosBackupPanel_default = /*#__PURE__*/ _plugin_vue_export_helper_default$1(/* @__PURE__ */ defineComponent({
+	__name: "CosBackupPanel",
 	setup(__props) {
 		const backupStore = useBackupStore();
 		const backupLoading = ref(false);
@@ -31916,7 +31876,7 @@ var S3BackupPanel_default = /*#__PURE__*/ _plugin_vue_export_helper_default$1(/*
 			const _component_ElButton = ElButton;
 			return openBlock(), createElementBlock("div", _hoisted_1, [
 				createVNode(BackupStatusCard_default),
-				createVNode(S3ConnectionForm_default),
+				createVNode(CosConnectionForm_default),
 				createVNode(BackupPolicyForm_default),
 				createBaseVNode("div", _hoisted_2, [
 					createVNode(_component_ElButton, { onClick: handleSaveConfig }, {
@@ -31946,7 +31906,7 @@ var S3BackupPanel_default = /*#__PURE__*/ _plugin_vue_export_helper_default$1(/*
 			]);
 		};
 	}
-}), [["__scopeId", "data-v-7299a7ff"]]);
+}), [["__scopeId", "data-v-67fc0f10"]]);
 //#endregion
 //#region src/renderer/layouts/AppShell/SettingsDrawer.vue
 var SettingsDrawer_default = /*#__PURE__*/ _plugin_vue_export_helper_default$1(/* @__PURE__ */ defineComponent({
@@ -31984,7 +31944,7 @@ var SettingsDrawer_default = /*#__PURE__*/ _plugin_vue_export_helper_default$1(/
 				size: "720px",
 				"before-close": handleClose
 			}, {
-				default: withCtx(() => [visible.value ? (openBlock(), createBlock(S3BackupPanel_default, { key: 0 })) : createCommentVNode("", true), createVNode(_component_ElCard, {
+				default: withCtx(() => [visible.value ? (openBlock(), createBlock(CosBackupPanel_default, { key: 0 })) : createCommentVNode("", true), createVNode(_component_ElCard, {
 					shadow: "never",
 					class: "diagnostics-card"
 				}, {
@@ -32002,7 +31962,7 @@ var SettingsDrawer_default = /*#__PURE__*/ _plugin_vue_export_helper_default$1(/
 			}, 8, ["modelValue"]);
 		};
 	}
-}), [["__scopeId", "data-v-51cfd4f0"]]);
+}), [["__scopeId", "data-v-191dd59c"]]);
 //#endregion
 //#region src/renderer/App.vue
 var App_default = /* @__PURE__ */ defineComponent({
@@ -32120,19 +32080,19 @@ var router = createRouter({
 		{
 			path: "/customers",
 			name: "customers",
-			component: () => __vitePreload(() => import("./CustomersPage-CwN7Ia5X.js"), __vite__mapDeps([0,1,2,3,4,5,6,7,8,9]), import.meta.url),
+			component: () => __vitePreload(() => import("./CustomersPage-BYaV_vm_.js"), __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11]), import.meta.url),
 			meta: { title: "客户管理" }
 		},
 		{
 			path: "/inventory",
 			name: "inventory",
-			component: () => __vitePreload(() => import("./InventoryPage-6ghWDp8b.js"), __vite__mapDeps([10,1,2,3,4,11,12,13,7,8,14,15]), import.meta.url),
+			component: () => __vitePreload(() => import("./InventoryPage-K7jtp4MA.js"), __vite__mapDeps([12,1,2,3,4,13,14,15,7,8,9,10,16,17]), import.meta.url),
 			meta: { title: "商品、库存与开票" }
 		},
 		{
 			path: "/outbound-records",
 			name: "outbound-records",
-			component: () => __vitePreload(() => import("./OutboundRecordsPage-gBhu51K8.js"), __vite__mapDeps([16,17,1,2,12,18,7,8,14,19]), import.meta.url),
+			component: () => __vitePreload(() => import("./OutboundRecordsPage-Cu16IN7z.js"), __vite__mapDeps([18,19,1,2,14,20,7,8,16,21]), import.meta.url),
 			meta: { title: "开票记录" }
 		},
 		{

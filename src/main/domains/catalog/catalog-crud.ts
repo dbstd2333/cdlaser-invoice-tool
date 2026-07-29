@@ -67,22 +67,40 @@ export function updateProduct(input: ProductUpsertInput): Product {
   return getProductById(input.id)!;
 }
 
-/** 切换商品启用状态 */
-export function toggleProductStatus(id: string): Product {
+/** 删除商品：校验库存为 0 且无销项/进项/补票记录后，连带删除其价格版本与库存流水 */
+export function deleteProduct(id: string): void {
   const product = getProductById(id);
   if (!product) throw new Error('商品不存在');
-  const db = getDb();
-  const newStatus: 'active' | 'inactive' = product.status === 'active' ? 'inactive' : 'active';
-  db.update(products).set({ status: newStatus, updatedAt: new Date().toISOString() }).where(eq(products.id, id)).run();
+  const raw = getRawDb();
 
-  recordAudit({
-    action: newStatus === 'active' ? 'product.activate' : 'product.deactivate',
-    entityType: 'product', entityId: id,
-    summary: `${newStatus === 'active' ? '启用' : '停用'}商品: ${product.name}`,
-    fieldChanges: [diffField('status', product.status, newStatus)!],
+  const pvs = raw.prepare('SELECT id, stock_balance FROM price_versions WHERE product_id = ?').all(id) as { id: string; stock_balance: number }[];
+  if (pvs.some((pv) => pv.stock_balance !== 0)) {
+    throw new Error('存在库存不为 0 的价格版本，请先清空库存再删除');
+  }
+  const pvIds = pvs.map((pv) => pv.id);
+  if (pvIds.length > 0) {
+    const placeholders = pvIds.map(() => '?').join(',');
+    const refCheck = (table: string, label: string): void => {
+      const row = raw.prepare(`SELECT COUNT(*) as c FROM ${table} WHERE price_version_id IN (${placeholders})`).get(...pvIds) as { c: number };
+      if (row.c > 0) throw new Error(`存在${label}记录，不能删除`);
+    };
+    refCheck('outbound_lines', '销项开票');
+    refCheck('inbound_lines', '进项');
+    refCheck('replenishment_export_lines', '月底补票');
+  }
+
+  const db = getDb();
+  const tx = raw.transaction(() => {
+    if (pvIds.length > 0) {
+      const placeholders = pvIds.map(() => '?').join(',');
+      raw.prepare(`DELETE FROM inventory_ledger WHERE price_version_id IN (${placeholders})`).run(...pvIds);
+      raw.prepare(`DELETE FROM price_versions WHERE id IN (${placeholders})`).run(...pvIds);
+    }
+    db.delete(products).where(eq(products.id, id)).run();
+    recordAudit({ action: 'product.delete', entityType: 'product', entityId: id, summary: `删除商品: ${product.name}` });
+    markDirty();
   });
-  markDirty();
-  return getProductById(id)!;
+  tx();
 }
 
 /** 新增价格版本 */
@@ -103,23 +121,6 @@ export function createPriceVersion(input: PriceVersionCreateInput): PriceVersion
   }).run();
 
   recordAudit({ action: 'price_version.create', entityType: 'price_version', entityId: id, summary: `新增价格版本: ${product.name} @ ${unitPriceDecimal}` });
-  markDirty();
-  return getPriceVersionById(id)!;
-}
-
-/** 切换价格版本启用状态 */
-export function togglePriceVersionStatus(id: string): PriceVersion {
-  const pv = getPriceVersionById(id);
-  if (!pv) throw new Error('价格版本不存在');
-  const db = getDb();
-  const newStatus: 'active' | 'inactive' = pv.status === 'active' ? 'inactive' : 'active';
-  db.update(priceVersions).set({ status: newStatus, updatedAt: new Date().toISOString() }).where(eq(priceVersions.id, id)).run();
-
-  recordAudit({
-    action: newStatus === 'active' ? 'price_version.activate' : 'price_version.deactivate',
-    entityType: 'price_version', entityId: id, summary: `${newStatus === 'active' ? '启用' : '停用'}价格版本`,
-    fieldChanges: [diffField('status', pv.status, newStatus)!],
-  });
   markDirty();
   return getPriceVersionById(id)!;
 }

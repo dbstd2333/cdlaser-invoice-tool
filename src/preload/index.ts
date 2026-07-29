@@ -22,7 +22,7 @@ import type {
   InboundPreviewResult,
   BackupStatus,
   BackupHistoryItem,
-  S3Config,
+  CosConfig,
 } from '../shared/contracts/preview-types';
 
 /**
@@ -71,9 +71,8 @@ const api = {
     getProductById: (id: string) => invoke<Product | null>(IPC_CHANNELS.catalog.getProductById, id),
     createProduct: (params: unknown) => invoke<Product>(IPC_CHANNELS.catalog.createProduct, params),
     updateProduct: (params: unknown) => invoke<Product>(IPC_CHANNELS.catalog.updateProduct, params),
-    toggleProductStatus: (id: string) => invoke<Product>(IPC_CHANNELS.catalog.toggleProductStatus, id),
     createPriceVersion: (params: unknown) => invoke<PriceVersion>(IPC_CHANNELS.catalog.createPriceVersion, params),
-    togglePriceVersionStatus: (id: string) => invoke<PriceVersion>(IPC_CHANNELS.catalog.togglePriceVersionStatus, id),
+    deleteProduct: (id: string) => invoke<void>(IPC_CHANNELS.catalog.deleteProduct, id),
     initialImportPreview: (filePath: string) => invoke<{ token: string; preview: CatalogImportPreviewResult }>(IPC_CHANNELS.catalog.initialImportPreview, filePath),
     initialImportConfirm: (token: string) => invoke<{ products: number; priceVersions: number }>(IPC_CHANNELS.catalog.initialImportConfirm, token),
     dailyImportPreview: (filePath: string) => invoke<{ token: string; preview: CatalogImportPreviewResult }>(IPC_CHANNELS.catalog.dailyImportPreview, filePath),
@@ -113,7 +112,7 @@ const api = {
   },
   backup: {
     getStatus: () => invoke<BackupStatus>(IPC_CHANNELS.backup.getStatus),
-    getConfig: () => invoke<{ configured: boolean; config: Partial<S3Config>; credentialConfigured: boolean }>(IPC_CHANNELS.backup.getConfig),
+    getConfig: () => invoke<{ configured: boolean; config: Partial<CosConfig>; credentialConfigured: boolean }>(IPC_CHANNELS.backup.getConfig),
     saveConfig: (params: unknown) => invoke<{ saved: boolean }>(IPC_CHANNELS.backup.saveConfig, params),
     testConnection: (params: unknown) => invoke<{ success: boolean; message: string }>(IPC_CHANNELS.backup.testConnection, params),
     create: () => invoke<{ taskId: string; objectKey: string; size: number; createdAt: string }>(IPC_CHANNELS.backup.create),

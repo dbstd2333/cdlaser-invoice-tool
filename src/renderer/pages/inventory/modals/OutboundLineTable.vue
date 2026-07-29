@@ -4,7 +4,7 @@
       <ElTableColumn prop="name" label="项目名称" min-width="150" />
       <ElTableColumn prop="model" label="型号" width="100" />
       <ElTableColumn prop="unit" label="单位" width="70" />
-      <ElTableColumn prop="unitPriceDecimal" label="单价" width="120" />
+      <ElTableColumn prop="unitPriceDecimal" label="含税单价" width="120" />
       <ElTableColumn label="当前库存" width="100">
         <template #default="{ row }">
           <ElTag :type="stockTagType(row.stockBalance)" size="small">{{ row.stockBalance }}</ElTag>
@@ -15,16 +15,8 @@
           <ElInputNumber v-model="row.quantity" :min="1" :step="1" :precision="0" size="small" @change="$emit('change')" />
         </template>
       </ElTableColumn>
-      <ElTableColumn label="金额" width="110">
-        <template #default="{ row }">{{ centToDisplay(calcAmountCent(row.quantity, row.unitPriceDecimal)) }}</template>
-      </ElTableColumn>
-      <ElTableColumn label="税额" width="110">
-        <template #default="{ row }">{{ centToDisplay(calcTaxCent(calcAmountCent(row.quantity, row.unitPriceDecimal))) }}</template>
-      </ElTableColumn>
-      <ElTableColumn label="价税合计" width="120">
-        <template #default="{ row }">
-          {{ centToDisplay(calcTotalCent(calcAmountCent(row.quantity, row.unitPriceDecimal), calcTaxCent(calcAmountCent(row.quantity, row.unitPriceDecimal)))) }}
-        </template>
+      <ElTableColumn label="金额" width="120">
+        <template #default="{ row }">{{ centToDisplay(lineAmount(row)) }}</template>
       </ElTableColumn>
       <ElTableColumn label="操作" width="80" fixed="right">
         <template #default="{ $index }">
@@ -37,16 +29,14 @@
     <div class="summary-bar">
       <span>行数：{{ lines.length }}</span>
       <span>数量合计：{{ totalQuantity }}</span>
-      <span>金额：{{ centToDisplay(totalAmountCent) }}</span>
-      <span>税额：{{ centToDisplay(totalTaxCent) }}</span>
-      <span class="total">价税合计：{{ centToDisplay(totalCent) }}</span>
+      <span class="total">金额：{{ centToDisplay(totalAmountCent) }}</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { calcAmountCent, calcTaxCent, calcTotalCent, centToDisplay } from '@shared/money';
+import { calcOutboundAmountCent, centToDisplay } from '@shared/money';
 
 /** 销项开票明细行 */
 interface OutboundLine {
@@ -59,13 +49,16 @@ interface OutboundLine {
   quantity: number;
 }
 
-const props = defineProps<{ lines: OutboundLine[] }>();
+const props = defineProps<{ lines: OutboundLine[]; factor: string }>();
 defineEmits<{ change: []; remove: [index: number] }>();
 
+/** 单行金额（分）= 含税单价 × 数量 × 系数 */
+function lineAmount(row: OutboundLine): number {
+  return calcOutboundAmountCent(row.quantity, row.unitPriceDecimal, props.factor);
+}
+
 const totalQuantity = computed(() => props.lines.reduce((sum, l) => sum + l.quantity, 0));
-const totalAmountCent = computed(() => props.lines.reduce((sum, l) => sum + calcAmountCent(l.quantity, l.unitPriceDecimal), 0));
-const totalTaxCent = computed(() => props.lines.reduce((sum, l) => sum + calcTaxCent(calcAmountCent(l.quantity, l.unitPriceDecimal)), 0));
-const totalCent = computed(() => totalAmountCent.value + totalTaxCent.value);
+const totalAmountCent = computed(() => props.lines.reduce((sum, l) => sum + lineAmount(l), 0));
 
 function stockTagType(balance: number): string {
   if (balance > 0) return 'success';

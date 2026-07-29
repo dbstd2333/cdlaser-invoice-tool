@@ -15,7 +15,7 @@ async function generateTemplate(): Promise<void> {
   const filePath = resolve(dir, '发票开具项目信息导入模板.xlsx');
 
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = '发票库存管理系统';
+  workbook.creator = '成都莱盛发票库存管理工具';
   workbook.created = new Date();
 
   // 明细模板工作表

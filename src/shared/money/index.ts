@@ -3,7 +3,8 @@ import Decimal from 'decimal.js';
 /**
  * 金额计算工具模块。
  * 所有业务金额计算统一使用 decimal.js，禁止使用 JS Number 浮点直接计算。
- * 金额、税额、价税合计均以「人民币分」整数存储；单价以规范化十进制字符串存储。
+ * 金额、税额、价税合计均以「人民币分」整数存储；单价以「含税单价」规范化十进制字符串存储，
+ * 计算不含税金额时由 taxExclusiveUnitPrice 反推（含税单价 ÷ 1.13）。
  */
 
 Decimal.set({
@@ -15,12 +16,14 @@ Decimal.set({
 export const TAX_RATE_INT = 13;
 export const TAX_RATE_DECIMAL = '0.13';
 export const TAX_RATE_FACTOR = new Decimal('0.13');
+/** 价税合计系数 = 1 + 税率 = 1.13，含税单价 ÷ 该值得不含税单价 */
+export const TAX_INCLUSIVE_FACTOR = new Decimal(1).plus(TAX_RATE_FACTOR);
 
 /** 单价最大小数位数 */
 export const UNIT_PRICE_MAX_DECIMALS = 13;
 
 /**
- * 规范化单价字符串：去除首尾空白，去除科学计数法，校验为正数。
+ * 规范化含税单价字符串：去除首尾空白，去除科学计数法，校验为正数。
  * 小数位数超过 UNIT_PRICE_MAX_DECIMALS（13）位时自动四舍五入到 13 位（而非报错），
  * 避免导入文件因单价精度被整批阻断；单价以十进制字符串存储，无浮点损失。
  * 返回不含前导零的最简十进制字符串（保留有效小数）。
@@ -38,12 +41,48 @@ export function normalizeUnitPrice(input: string | number | Decimal): string {
 }
 
 /**
- * 计算金额（分）= 数量 × 不含税单价，四舍五入到 2 位。
+ * 含税单价 -> 不含税单价（含税单价 ÷ 1.13），四舍五入到 13 位小数。
+ * 用于销项导出填入金税模板的「商品单价」列（国税标准为不含税单价），
+ * 以及由含税单价计算不含税金额。
+ */
+export function taxExclusiveUnitPrice(taxInclusive: string | number | Decimal): string {
+  const d = new Decimal(String(taxInclusive).trim());
+  const exclusive = d.div(TAX_INCLUSIVE_FACTOR);
+  return exclusive.toDecimalPlaces(UNIT_PRICE_MAX_DECIMALS, Decimal.ROUND_HALF_UP).toString();
+}
+
+/**
+ * 计算不含税金额（分）= 数量 ×（含税单价 ÷ 1.13），四舍五入到 2 位。
+ * unitPriceDecimal 为含税单价，内部先经 taxExclusiveUnitPrice 反推不含税单价，
+ * 保证「不含税单价 × 数量 = 不含税金额」与金税模板一致。
  */
 export function calcAmountCent(quantity: number, unitPriceDecimal: string): number {
-  const amount = new Decimal(quantity).times(new Decimal(unitPriceDecimal));
+  const exclusive = new Decimal(taxExclusiveUnitPrice(unitPriceDecimal));
+  const amount = new Decimal(quantity).times(exclusive);
   const rounded = amount.toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
   return rounded.times(100).round().toNumber();
+}
+
+/** 销项开票默认金额系数（金额 = 含税单价 × 系数） */
+export const OUTBOUND_AMOUNT_FACTOR = '1.09';
+
+/**
+ * 销项开票金额（分）= 含税单价 × 数量 × 系数，四舍五入到 2 位。
+ * 直接按含税单价乘固定系数，不另算税额/价税合计/不含税金额。
+ */
+export function calcOutboundAmountCent(
+  quantity: number,
+  taxInclusiveUnitPrice: string,
+  factor: string | number = OUTBOUND_AMOUNT_FACTOR,
+): number {
+  const amount = new Decimal(quantity).times(new Decimal(taxInclusiveUnitPrice)).times(new Decimal(factor));
+  const rounded = amount.toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+  return rounded.times(100).round().toNumber();
+}
+
+/** 单价 × 系数（保留 13 位小数），用于销项导出「商品单价」列 = 含税单价 × 系数 */
+export function scaleUnitPrice(unitPrice: string | number | Decimal, factor: string | number): string {
+  return new Decimal(String(unitPrice)).times(new Decimal(factor)).toDecimalPlaces(UNIT_PRICE_MAX_DECIMALS, Decimal.ROUND_HALF_UP).toString();
 }
 
 /**

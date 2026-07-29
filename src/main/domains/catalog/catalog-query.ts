@@ -41,6 +41,14 @@ function buildQueryConditions(input: PriceVersionQueryInput): { conditions: stri
     conditions.push('(p.name LIKE ? OR p.model LIKE ? OR p.tax_classification_code LIKE ?)');
     params.push(kw, kw, kw);
   }
+  if (input.name?.trim()) {
+    conditions.push('p.name LIKE ?');
+    params.push(`%${input.name.trim()}%`);
+  }
+  if (input.model?.trim()) {
+    conditions.push('p.model LIKE ?');
+    params.push(`%${input.model.trim()}%`);
+  }
   if (input.stockStatus && input.stockStatus !== 'all') {
     const map = { positive: 'pv.stock_balance > 0', zero: 'pv.stock_balance = 0', negative: 'pv.stock_balance < 0' };
     conditions.push(map[input.stockStatus]);

@@ -49,7 +49,8 @@ decimal_js = __toESM(decimal_js);
 let jszip = require("jszip");
 jszip = __toESM(jszip);
 let node_crypto = require("node:crypto");
-let _aws_sdk_client_s3 = require("@aws-sdk/client-s3");
+let cos_nodejs_sdk_v5 = require("cos-nodejs-sdk-v5");
+cos_nodejs_sdk_v5 = __toESM(cos_nodejs_sdk_v5);
 //#region src/main/db/schema/index.ts
 var schema_exports = /* @__PURE__ */ __exportAll({
 	appSettings: () => appSettings,
@@ -916,17 +917,14 @@ var voidRequestSchema = zod.z.object({
 	id: zod.z.string().min(1),
 	reason: zod.z.string().min(1, "作废原因必填")
 });
-/** S3 配置 */
-var s3ConfigSchema = zod.z.object({
-	serviceType: zod.z.enum(["aws", "compatible"]),
-	endpoint: zod.z.string().optional(),
-	region: zod.z.string().min(1),
-	bucket: zod.z.string().min(1),
+/** 腾讯云 COS 配置 */
+var cosConfigSchema = zod.z.object({
+	region: zod.z.string().trim().min(1, "Region 必填"),
+	bucket: zod.z.string().trim().regex(/^[a-z0-9][a-z0-9.-]*-\d+$/, "Bucket 格式应为 BucketName-APPID"),
 	prefix: zod.z.string().optional(),
-	accessKeyId: zod.z.string().optional(),
-	secretAccessKey: zod.z.string().optional(),
-	sessionToken: zod.z.string().optional(),
-	pathStyle: zod.z.boolean().optional(),
+	secretId: zod.z.string().optional(),
+	secretKey: zod.z.string().optional(),
+	securityToken: zod.z.string().optional(),
 	autoBackup: zod.z.boolean().optional(),
 	retentionCount: zod.z.number().int().min(1).max(100).optional(),
 	restorePassword: zod.z.string().optional()
@@ -1112,7 +1110,7 @@ function consistencyCheck() {
 */
 /** 脱敏：移除完整税号、银行账号、密钥等敏感信息 */
 function sanitizeText(text) {
-	return text.replace(/纳税(人)?(识别号|税号)[：:\s]*([0-9A-Za-z]{4})[0-9A-Za-z]+([0-9A-Za-z]{4})/g, "$1$2: $3****$4").replace(/银行账号[：:\s]*\d+(\d{4})/g, "银行账号: ****$1").replace(/bank_account[：:\s]*\d+(\d{4})/g, "bank_account: ****$1").replace(/AKIA[A-Z0-9]+/g, "AKIA****").replace(/access[_-]?key[_-]?id[":\s]+["']?[^"',}\s]+/gi, "access_key_id: ***").replace(/secret[_-]?access[_-]?key[":\s]+["']?[^"',}\s]+/gi, "secret_access_key: ***").replace(/session[_-]?token[":\s]+["']?[^"',}\s]+/gi, "session_token: ***").replace(/restore[_-]?password[":\s]+["']?[^"',}\s]+/gi, "restore_password: ***");
+	return text.replace(/纳税(人)?(识别号|税号)[：:\s]*([0-9A-Za-z]{4})[0-9A-Za-z]+([0-9A-Za-z]{4})/g, "$1$2: $3****$4").replace(/银行账号[：:\s]*\d+(\d{4})/g, "银行账号: ****$1").replace(/bank_account[：:\s]*\d+(\d{4})/g, "bank_account: ****$1").replace(/AKID[A-Za-z0-9]+/g, "AKID****").replace(/secret[_-]?id[":\s]+["']?[^"',}\s]+/gi, "secret_id: ***").replace(/secret[_-]?key[":\s]+["']?[^"',}\s]+/gi, "secret_key: ***").replace(/security[_-]?token[":\s]+["']?[^"',}\s]+/gi, "security_token: ***").replace(/restore[_-]?password[":\s]+["']?[^"',}\s]+/gi, "restore_password: ***");
 }
 /** 读取最近日志文件（脱敏后） */
 function collectSanitizedLogs() {
@@ -1237,7 +1235,7 @@ function registerSystemIpc() {
 		if (saveResult.canceled || !saveResult.filePath) return { saved: false };
 		const report = [
 			"========================================",
-			"发票库存管理系统 - 诊断包",
+			"成都莱盛发票库存管理工具 - 诊断包",
 			"========================================",
 			"",
 			`生成时间: ${(/* @__PURE__ */ new Date()).toISOString()}`,
@@ -4553,32 +4551,29 @@ function registerInventoryIpc() {
 //#endregion
 //#region src/main/domains/backup/backup-config.ts
 /**
-* S3 配置管理。
-* 敏感字段使用 Electron safeStorage (DPAPI) 加密存储。
+* 腾讯云 COS 配置管理。
+* 敏感字段使用 Electron safeStorage 加密存储。
 */
-var CONFIG_FILE = "s3-config.enc";
+var CONFIG_FILE = "cos-config.enc";
 /** 获取配置文件路径 */
 function getConfigPath() {
 	const dataDir = (0, node_path.resolve)(electron.app.getPath("userData"), "data");
 	if (!(0, node_fs.existsSync)(dataDir)) (0, node_fs.mkdirSync)(dataDir, { recursive: true });
 	return (0, node_path.resolve)(dataDir, CONFIG_FILE);
 }
-/** 加密保存 S3 配置（敏感字段用 safeStorage 加密） */
-function saveS3Config(config) {
+/** 加密保存 COS 配置（敏感字段用 safeStorage 加密） */
+function saveCosConfig(config) {
 	const nonSensitive = {
-		serviceType: config.serviceType,
-		endpoint: config.endpoint,
 		region: config.region,
 		bucket: config.bucket,
 		prefix: config.prefix,
-		pathStyle: config.pathStyle,
 		autoBackup: config.autoBackup,
 		retentionCount: config.retentionCount
 	};
 	const sensitive = {
-		accessKeyId: config.accessKeyId || "",
-		secretAccessKey: config.secretAccessKey || "",
-		sessionToken: config.sessionToken || "",
+		secretId: config.secretId || "",
+		secretKey: config.secretKey || "",
+		securityToken: config.securityToken || "",
 		restorePassword: config.restorePassword || ""
 	};
 	const encryptedSensitive = electron.safeStorage.encryptString(JSON.stringify(sensitive));
@@ -4587,17 +4582,17 @@ function saveS3Config(config) {
 		sensitive: encryptedSensitive.toString("base64")
 	}), "utf-8");
 }
-/** 读取 S3 配置（敏感字段在主进程内解密） */
-function loadS3Config() {
+/** 读取 COS 配置（敏感字段在主进程内解密） */
+function loadCosConfig() {
 	const configPath = getConfigPath();
 	if (!(0, node_fs.existsSync)(configPath)) return null;
 	try {
 		const payload = JSON.parse((0, node_fs.readFileSync)(configPath, "utf-8"));
 		const sensitiveBuf = Buffer.from(payload.sensitive, "base64");
 		let sensitive = {
-			accessKeyId: "",
-			secretAccessKey: "",
-			sessionToken: "",
+			secretId: "",
+			secretKey: "",
+			securityToken: "",
 			restorePassword: ""
 		};
 		if (electron.safeStorage.isEncryptionAvailable() && sensitiveBuf.length > 0) try {
@@ -4607,9 +4602,9 @@ function loadS3Config() {
 		}
 		return {
 			...payload.nonSensitive,
-			accessKeyId: sensitive.accessKeyId || void 0,
-			secretAccessKey: sensitive.secretAccessKey || void 0,
-			sessionToken: sensitive.sessionToken || void 0,
+			secretId: sensitive.secretId || void 0,
+			secretKey: sensitive.secretKey || void 0,
+			securityToken: sensitive.securityToken || void 0,
 			restorePassword: sensitive.restorePassword || void 0
 		};
 	} catch (err) {
@@ -4619,7 +4614,7 @@ function loadS3Config() {
 }
 /** 获取配置摘要（不含密钥，用于渲染进程展示） */
 function getConfigSummary() {
-	const config = loadS3Config();
+	const config = loadCosConfig();
 	if (!config) return {
 		configured: false,
 		config: {},
@@ -4628,16 +4623,13 @@ function getConfigSummary() {
 	return {
 		configured: true,
 		config: {
-			serviceType: config.serviceType,
-			endpoint: config.endpoint,
 			region: config.region,
 			bucket: config.bucket,
 			prefix: config.prefix,
-			pathStyle: config.pathStyle,
 			autoBackup: config.autoBackup,
 			retentionCount: config.retentionCount
 		},
-		credentialConfigured: !!(config.accessKeyId && config.secretAccessKey)
+		credentialConfigured: !!(config.secretId && config.secretKey)
 	};
 }
 //#endregion
@@ -4776,100 +4768,122 @@ function restoreDatabase(dbBuffer) {
 	}
 }
 //#endregion
-//#region src/main/domains/backup/s3-client.ts
+//#region src/main/domains/backup/cos-client.ts
 /**
-* S3 客户端封装 - 支持 AWS S3 和 S3 兼容服务。
+* 腾讯云 COS 客户端封装。
 */
-/** 创建 S3 客户端 */
-function createS3Client(config) {
-	const clientConfig = {
-		region: config.region,
-		forcePathStyle: config.pathStyle ?? false,
-		credentials: config.accessKeyId ? {
-			accessKeyId: config.accessKeyId,
-			secretAccessKey: config.secretAccessKey,
-			sessionToken: config.sessionToken
-		} : void 0
-	};
-	if (config.serviceType === "compatible" && config.endpoint) clientConfig.endpoint = config.endpoint;
-	return new _aws_sdk_client_s3.S3Client(clientConfig);
+/** 创建 COS 客户端。 */
+function createCosClient(config) {
+	return new cos_nodejs_sdk_v5.default({
+		SecretId: config.secretId,
+		SecretKey: config.secretKey,
+		SecurityToken: config.securityToken
+	});
 }
-/** 测试 S3 连接 */
-async function testS3Connection(config) {
+/** 测试 COS 存储桶连接。 */
+async function testCosConnection(config) {
 	try {
-		await createS3Client(config).send(new _aws_sdk_client_s3.HeadBucketCommand({ Bucket: config.bucket }));
+		await createCosClient(config).headBucket({
+			Bucket: config.bucket,
+			Region: config.region
+		});
 		return {
 			success: true,
-			message: "Bucket 可访问，读写验证成功"
+			message: "COS Bucket 连接成功"
 		};
 	} catch (err) {
-		const message = err instanceof Error ? err.message : String(err);
-		electron_log_main.default.warn("[s3] 连接测试失败:", message);
+		const message = getErrorMessage(err);
+		electron_log_main.default.warn("[cos] 连接测试失败:", sanitizeErrorMessage(message));
 		return {
 			success: false,
 			message: sanitizeErrorMessage(message)
 		};
 	}
 }
-/** 清理错误消息中的敏感信息 */
-function sanitizeErrorMessage(message) {
-	return message.replace(/AKIA[A-Z0-9]+/g, "***").replace(/access[_-]?key[^,}]*/gi, "***").replace(/secret[_-]?key[^,}]*/gi, "***");
+/** 从 COS SDK 异常中提取不含请求明细的可读信息。 */
+function getErrorMessage(error) {
+	if (error instanceof Error) return error.message;
+	if (!error || typeof error !== "object") return String(error);
+	const detail = error;
+	return [
+		detail.code,
+		detail.message,
+		detail.statusCode
+	].filter((value) => typeof value === "string" || typeof value === "number").map(String).join(" · ") || "COS 请求失败";
 }
-/** 构造对象键 */
+/** 清理错误消息中的敏感信息。 */
+function sanitizeErrorMessage(message) {
+	return message.replace(/AKID[A-Za-z0-9]+/g, "***").replace(/secret[_-]?id[^,}]*/gi, "***").replace(/secret[_-]?key[^,}]*/gi, "***");
+}
+/** 构造备份对象键。 */
 function buildObjectKey(prefix, installId) {
 	const now = /* @__PURE__ */ new Date();
 	const yyyy = now.getUTCFullYear();
 	const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
 	const ts = `${yyyy}${mm}${String(now.getUTCDate()).padStart(2, "0")}-${String(now.getUTCHours()).padStart(2, "0")}${String(now.getUTCMinutes()).padStart(2, "0")}${String(now.getUTCSeconds()).padStart(2, "0")}Z`;
-	return `${prefix ? prefix.replace(/^\/+|\/+$/g, "") : ""}/${installId}/${yyyy}/${mm}/invoice-backup-${ts}.cdbak`;
+	return [
+		prefix ? prefix.replace(/^\/+|\/+$/g, "") : "",
+		installId,
+		yyyy,
+		mm,
+		`invoice-backup-${ts}.cdbak`
+	].filter(Boolean).join("/");
 }
-/** 上传备份 */
+/** 上传备份文件到 COS。 */
 async function uploadBackup(config, objectKey, data, manifest) {
-	await createS3Client(config).send(new _aws_sdk_client_s3.PutObjectCommand({
+	await createCosClient(config).putObject({
 		Bucket: config.bucket,
+		Region: config.region,
 		Key: objectKey,
 		Body: data,
+		ContentLength: data.length,
 		ContentType: "application/octet-stream",
-		Metadata: {
-			"app-version": manifest.appVersion,
-			"schema-version": manifest.schemaVersion,
-			"backup-type": manifest.backupType,
-			"created-at": manifest.createdAt
-		}
-	}));
+		"x-cos-meta-app-version": manifest.appVersion,
+		"x-cos-meta-schema-version": manifest.schemaVersion,
+		"x-cos-meta-backup-type": manifest.backupType,
+		"x-cos-meta-created-at": manifest.createdAt
+	});
 }
-/** 列出备份对象 */
+/** 列出 COS 中的备份对象。 */
 async function listBackupObjects(config, prefix) {
-	const client = createS3Client(config);
 	const prefixPart = prefix ? prefix.replace(/^\/+|\/+$/g, "") + "/" : "";
-	return ((await client.send(new _aws_sdk_client_s3.ListObjectsV2Command({
-		Bucket: config.bucket,
-		Prefix: prefixPart,
-		MaxKeys: 100
-	}))).Contents || []).filter((obj) => obj.Key?.endsWith(".cdbak")).map((obj) => ({
+	const client = createCosClient(config);
+	const contents = [];
+	let marker;
+	do {
+		const response = await client.getBucket({
+			Bucket: config.bucket,
+			Region: config.region,
+			Prefix: prefixPart,
+			Marker: marker,
+			MaxKeys: 1e3
+		});
+		contents.push(...response.Contents || []);
+		marker = response.IsTruncated === "true" ? response.NextMarker : void 0;
+	} while (marker);
+	return contents.filter((object) => object.Key.endsWith(".cdbak")).map((obj) => ({
 		key: obj.Key,
-		size: obj.Size || 0,
-		lastModified: obj.LastModified
+		size: Number(obj.Size) || 0,
+		lastModified: obj.LastModified ? new Date(obj.LastModified) : void 0
 	}));
 }
-/** 下载备份对象 */
+/** 从 COS 下载备份对象。 */
 async function downloadBackupObject(config, objectKey) {
-	const response = await createS3Client(config).send(new _aws_sdk_client_s3.GetObjectCommand({
+	return (await createCosClient(config).getObject({
 		Bucket: config.bucket,
+		Region: config.region,
 		Key: objectKey
-	}));
-	const chunks = [];
-	const stream = response.Body;
-	for await (const chunk of stream) chunks.push(Buffer.from(chunk));
-	return Buffer.concat(chunks);
+	})).Body;
 }
-/** 删除过期备份 */
+/** 批量删除 COS 中的过期备份。 */
 async function deleteOldBackups(config, keysToDelete) {
 	if (keysToDelete.length === 0) return;
-	await createS3Client(config).send(new _aws_sdk_client_s3.DeleteObjectsCommand({
+	await createCosClient(config).deleteMultipleObject({
 		Bucket: config.bucket,
-		Delete: { Objects: keysToDelete.map((key) => ({ Key: key })) }
-	}));
+		Region: config.region,
+		Objects: keysToDelete.map((key) => ({ Key: key })),
+		Quiet: true
+	});
 }
 //#endregion
 //#region src/main/ipc/backup-ipc.ts
@@ -4880,7 +4894,7 @@ async function deleteOldBackups(config, keysToDelete) {
 var currentTask = null;
 function registerBackupIpc() {
 	registerHandler(IPC_CHANNELS.backup.getStatus, null, () => {
-		const config = loadS3Config();
+		const config = loadCosConfig();
 		const lastBackupTime = getSetting("last_backup_time");
 		const lastBackupSize = getSetting("last_backup_size");
 		const lastError = getSetting("last_backup_error");
@@ -4890,36 +4904,38 @@ function registerBackupIpc() {
 			lastBackupSize: lastBackupSize ? parseInt(lastBackupSize, 10) : null,
 			dirty: isDirty(),
 			lastError,
-			credentialConfigured: !!(config?.accessKeyId && config?.secretAccessKey)
+			credentialConfigured: !!(config?.secretId && config?.secretKey)
 		};
 	});
 	registerHandler(IPC_CHANNELS.backup.getConfig, null, () => {
 		return getConfigSummary();
 	});
-	registerHandler(IPC_CHANNELS.backup.saveConfig, s3ConfigSchema, (input) => {
-		const existing = loadS3Config();
-		saveS3Config({
+	registerHandler(IPC_CHANNELS.backup.saveConfig, cosConfigSchema, (input) => {
+		const existing = loadCosConfig();
+		const replacingCredentials = !!(input.secretId || input.secretKey);
+		saveCosConfig({
 			...input,
-			accessKeyId: input.accessKeyId || existing?.accessKeyId,
-			secretAccessKey: input.secretAccessKey || existing?.secretAccessKey,
-			sessionToken: input.sessionToken || existing?.sessionToken,
+			secretId: input.secretId || existing?.secretId,
+			secretKey: input.secretKey || existing?.secretKey,
+			securityToken: replacingCredentials ? input.securityToken || void 0 : input.securityToken || existing?.securityToken,
 			restorePassword: input.restorePassword || existing?.restorePassword
 		});
 		return { saved: true };
 	});
-	registerHandler(IPC_CHANNELS.backup.testConnection, s3ConfigSchema, async (input) => {
-		const existing = loadS3Config();
-		return testS3Connection({
+	registerHandler(IPC_CHANNELS.backup.testConnection, cosConfigSchema, async (input) => {
+		const existing = loadCosConfig();
+		const replacingCredentials = !!(input.secretId || input.secretKey);
+		return testCosConnection({
 			...input,
-			accessKeyId: input.accessKeyId || existing?.accessKeyId,
-			secretAccessKey: input.secretAccessKey || existing?.secretAccessKey,
-			sessionToken: input.sessionToken || existing?.sessionToken
+			secretId: input.secretId || existing?.secretId,
+			secretKey: input.secretKey || existing?.secretKey,
+			securityToken: replacingCredentials ? input.securityToken || void 0 : input.securityToken || existing?.securityToken
 		});
 	});
-	registerHandler(IPC_CHANNELS.backup.create, null, async (_input, sender) => {
-		const config = loadS3Config();
-		if (!config) throw new Error("未配置 S3 连接");
-		if (!config.accessKeyId || !config.secretAccessKey) throw new Error("未配置 S3 凭据");
+	registerHandler(IPC_CHANNELS.backup.create, null, async () => {
+		const config = loadCosConfig();
+		if (!config) throw new Error("未配置腾讯云 COS 连接");
+		if (!config.secretId || !config.secretKey) throw new Error("未配置腾讯云 COS 凭据");
 		if (!config.restorePassword) throw new Error("未设置恢复密码");
 		const taskId = `backup-${Date.now()}`;
 		currentTask = {
@@ -4972,7 +4988,7 @@ function registerBackupIpc() {
 		}
 	});
 	registerHandler(IPC_CHANNELS.backup.list, null, async () => {
-		const config = loadS3Config();
+		const config = loadCosConfig();
 		if (!config) return {
 			rows: [],
 			total: 0
@@ -5004,9 +5020,9 @@ function registerBackupIpc() {
 			total: rows.length
 		};
 	});
-	registerHandler(IPC_CHANNELS.backup.restore, restoreRequestSchema, async (input, sender) => {
-		const config = loadS3Config();
-		if (!config) throw new Error("未配置 S3 连接");
+	registerHandler(IPC_CHANNELS.backup.restore, restoreRequestSchema, async (input) => {
+		const config = loadCosConfig();
+		if (!config) throw new Error("未配置腾讯云 COS 连接");
 		const taskId = `restore-${Date.now()}`;
 		currentTask = {
 			taskId,
@@ -5078,7 +5094,7 @@ function createWindow() {
 		minWidth: 1024,
 		minHeight: 720,
 		show: false,
-		title: "发票库存管理系统",
+		title: "成都莱盛发票库存管理工具",
 		webPreferences: {
 			preload: (0, node_path.resolve)(__dirname, "../preload/index.js"),
 			contextIsolation: true,

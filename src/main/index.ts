@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
  */
 
 // 确保应用名称
-app.setName('发票库存管理系统');
+app.setName('成都莱盛发票库存管理工具');
 
 // 设置 userData 目录
 app.setPath('userData', resolve(app.getPath('home'), '.cdlaser-invoice-tool'));

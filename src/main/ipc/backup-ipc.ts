@@ -1,10 +1,9 @@
-import { app, type WebContents } from 'electron';
 import { registerHandler } from '../security/ipc-security';
 import { IPC_CHANNELS } from '@shared/contracts/channels';
-import { s3ConfigSchema, restoreRequestSchema } from '@shared/schemas/index';
+import { cosConfigSchema, restoreRequestSchema } from '@shared/schemas/index';
 import {
-  saveS3Config,
-  loadS3Config,
+  saveCosConfig,
+  loadCosConfig,
   getConfigSummary,
   createBackupPayload,
   decryptBackup,
@@ -13,13 +12,13 @@ import {
   type BackupStatus,
 } from '../domains/backup/backup-service';
 import {
-  testS3Connection,
+  testCosConnection,
   buildObjectKey,
   uploadBackup,
   listBackupObjects,
   downloadBackupObject,
   deleteOldBackups,
-} from '../domains/backup/s3-client';
+} from '../domains/backup/cos-client';
 import { getOrCreateInstallId, isDirty, clearDirty, getSetting, setSetting } from '../domains/audit/settings-service';
 import { initDatabase, closeDatabase } from '../db/connection';
 import log from 'electron-log/main';
@@ -34,7 +33,7 @@ let currentTask: { taskId: string; type: 'backup' | 'restore'; phase: string; pr
 export function registerBackupIpc(): void {
   // 获取备份状态
   registerHandler(IPC_CHANNELS.backup.getStatus, null, (): BackupStatus => {
-    const config = loadS3Config();
+    const config = loadCosConfig();
     const lastBackupTime = getSetting('last_backup_time');
     const lastBackupSize = getSetting('last_backup_size');
     const lastError = getSetting('last_backup_error');
@@ -44,7 +43,7 @@ export function registerBackupIpc(): void {
       lastBackupSize: lastBackupSize ? parseInt(lastBackupSize, 10) : null,
       dirty: isDirty(),
       lastError: lastError,
-      credentialConfigured: !!(config?.accessKeyId && config?.secretAccessKey),
+      credentialConfigured: !!(config?.secretId && config?.secretKey),
     };
   });
 
@@ -54,38 +53,44 @@ export function registerBackupIpc(): void {
   });
 
   // 保存配置
-  registerHandler(IPC_CHANNELS.backup.saveConfig, s3ConfigSchema, (input) => {
+  registerHandler(IPC_CHANNELS.backup.saveConfig, cosConfigSchema, (input) => {
     // 如果没有提供新密钥，保留旧密钥
-    const existing = loadS3Config();
+    const existing = loadCosConfig();
+    const replacingCredentials = !!(input.secretId || input.secretKey);
     const configToSave = {
       ...input,
-      accessKeyId: input.accessKeyId || existing?.accessKeyId,
-      secretAccessKey: input.secretAccessKey || existing?.secretAccessKey,
-      sessionToken: input.sessionToken || existing?.sessionToken,
+      secretId: input.secretId || existing?.secretId,
+      secretKey: input.secretKey || existing?.secretKey,
+      securityToken: replacingCredentials
+        ? input.securityToken || undefined
+        : input.securityToken || existing?.securityToken,
       restorePassword: input.restorePassword || existing?.restorePassword,
     };
-    saveS3Config(configToSave);
+    saveCosConfig(configToSave);
     return { saved: true };
   });
 
   // 测试连接
-  registerHandler(IPC_CHANNELS.backup.testConnection, s3ConfigSchema, async (input) => {
+  registerHandler(IPC_CHANNELS.backup.testConnection, cosConfigSchema, async (input) => {
     // 合并已有密钥
-    const existing = loadS3Config();
+    const existing = loadCosConfig();
+    const replacingCredentials = !!(input.secretId || input.secretKey);
     const configToTest = {
       ...input,
-      accessKeyId: input.accessKeyId || existing?.accessKeyId,
-      secretAccessKey: input.secretAccessKey || existing?.secretAccessKey,
-      sessionToken: input.sessionToken || existing?.sessionToken,
+      secretId: input.secretId || existing?.secretId,
+      secretKey: input.secretKey || existing?.secretKey,
+      securityToken: replacingCredentials
+        ? input.securityToken || undefined
+        : input.securityToken || existing?.securityToken,
     };
-    return testS3Connection(configToTest);
+    return testCosConnection(configToTest);
   });
 
   // 立即备份
-  registerHandler(IPC_CHANNELS.backup.create, null, async (_input: null, sender: WebContents) => {
-    const config = loadS3Config();
-    if (!config) throw new Error('未配置 S3 连接');
-    if (!config.accessKeyId || !config.secretAccessKey) throw new Error('未配置 S3 凭据');
+  registerHandler(IPC_CHANNELS.backup.create, null, async () => {
+    const config = loadCosConfig();
+    if (!config) throw new Error('未配置腾讯云 COS 连接');
+    if (!config.secretId || !config.secretKey) throw new Error('未配置腾讯云 COS 凭据');
     if (!config.restorePassword) throw new Error('未设置恢复密码');
 
     const taskId = `backup-${Date.now()}`;
@@ -140,7 +145,7 @@ export function registerBackupIpc(): void {
 
   // 列出备份
   registerHandler(IPC_CHANNELS.backup.list, null, async () => {
-    const config = loadS3Config();
+    const config = loadCosConfig();
     if (!config) return { rows: [], total: 0 };
     const objects = await listBackupObjects(config, config.prefix || '');
     const installId = getOrCreateInstallId();
@@ -172,9 +177,9 @@ export function registerBackupIpc(): void {
   });
 
   // 恢复
-  registerHandler(IPC_CHANNELS.backup.restore, restoreRequestSchema, async (input, sender: WebContents) => {
-    const config = loadS3Config();
-    if (!config) throw new Error('未配置 S3 连接');
+  registerHandler(IPC_CHANNELS.backup.restore, restoreRequestSchema, async (input) => {
+    const config = loadCosConfig();
+    if (!config) throw new Error('未配置腾讯云 COS 连接');
 
     const taskId = `restore-${Date.now()}`;
     currentTask = { taskId, type: 'restore', phase: '下载备份', progress: 0, processedBytes: 0 };

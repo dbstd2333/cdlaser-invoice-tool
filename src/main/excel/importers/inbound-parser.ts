@@ -37,7 +37,7 @@ function buildInboundColMap(headerRow: import('exceljs').Row): Record<string, nu
     model: findColumnIndex(headerRow, ['规格型号', '型号', '规格']),
     unit: findColumnIndex(headerRow, ['单位']),
     quantity: findColumnIndex(headerRow, ['数量']),
-    price: findColumnIndex(headerRow, ['单价', '不含税单价']),
+    price: findColumnIndex(headerRow, ['含税单价', '单价']),
     amount: findColumnIndex(headerRow, ['金额', '不含税金额']),
     tax: findColumnIndex(headerRow, ['税额', '税']),
     total: findColumnIndex(headerRow, ['合计', '价税合计']),

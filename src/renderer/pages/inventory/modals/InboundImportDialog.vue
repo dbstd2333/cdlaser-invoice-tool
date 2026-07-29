@@ -39,7 +39,7 @@
               <ElTableColumn prop="name" label="品名" min-width="130" />
               <ElTableColumn prop="model" label="型号" width="100" />
               <ElTableColumn prop="unit" label="单位" width="70" />
-              <ElTableColumn prop="unitPriceDecimal" label="单价" width="110" />
+              <ElTableColumn prop="unitPriceDecimal" label="含税单价" width="110" />
               <ElTableColumn prop="quantity" label="数量" width="80" />
               <ElTableColumn label="金额" width="100">
                 <template #default="{ row }">{{ centToDisplay(row.amountCent) }}</template>

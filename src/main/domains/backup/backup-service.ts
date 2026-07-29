@@ -1,5 +1,5 @@
 /**
- * S3 云备份服务入口 - 重新导出各子模块。
+ * 腾讯云 COS 备份服务入口 - 重新导出各子模块。
  *
  * 模块拆分：
  * - backup-types: 类型定义
@@ -8,7 +8,7 @@
  * - backup-snapshot: 数据库快照、备份创建和恢复
  */
 
-export type { S3Config, BackupStatus, BackupHistoryItem, BackupPayload } from './backup-types';
+export type { CosConfig, BackupStatus, BackupHistoryItem, BackupPayload } from './backup-types';
 
-export { saveS3Config, loadS3Config, getConfigSummary } from './backup-config';
+export { saveCosConfig, loadCosConfig, getConfigSummary } from './backup-config';
 export { createDbSnapshot, createBackupPayload, decryptBackup, createPreRestoreBackup, restoreDatabase } from './backup-snapshot';

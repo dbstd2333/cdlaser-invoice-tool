@@ -19,7 +19,7 @@ import { useAppStore } from '../../stores/app';
 const appStore = useAppStore();
 const route = useRoute();
 
-const pageTitle = computed(() => (route.meta.title as string) || '发票库存管理系统');
+const pageTitle = computed(() => (route.meta.title as string) || '成都莱盛发票库存管理工具');
 </script>
 
 <style scoped>

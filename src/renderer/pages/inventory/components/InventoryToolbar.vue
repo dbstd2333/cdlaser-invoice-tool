@@ -3,11 +3,19 @@
     <!-- 筛选行 -->
     <div class="toolbar-filters">
       <ElInput
-        :model-value="keyword"
-        placeholder="项目名称、型号、税收分类编码"
+        :model-value="name"
+        placeholder="项目名称"
         clearable
-        style="width: 260px"
-        @update:model-value="$emit('update:keyword', $event)"
+        style="width: 200px"
+        @update:model-value="$emit('update:name', $event)"
+        @keyup.enter="$emit('search')"
+      />
+      <ElInput
+        :model-value="model"
+        placeholder="型号"
+        clearable
+        style="width: 160px"
+        @update:model-value="$emit('update:model', $event)"
         @keyup.enter="$emit('search')"
       />
       <ElSelect :model-value="stockStatus" placeholder="库存状态" style="width: 110px" @update:model-value="$emit('update:stockStatus', $event)">
@@ -16,17 +24,12 @@
         <ElOption label="已平衡" value="zero" />
         <ElOption label="待补票" value="negative" />
       </ElSelect>
-      <ElSelect :model-value="productStatus" placeholder="启用状态" style="width: 110px" @update:model-value="$emit('update:productStatus', $event)">
-        <ElOption label="全部" value="all" />
-        <ElOption label="启用" value="active" />
-        <ElOption label="停用" value="inactive" />
-      </ElSelect>
       <ElButton type="primary" @click="$emit('search')">搜索</ElButton>
       <ElButton @click="$emit('reset')">重置</ElButton>
       <ElButton style="margin-left: auto" @click="$emit('refresh')">刷新</ElButton>
     </div>
 
-    <!-- 操作按钮行 - 三列布局 -->
+    <!-- 操作按钮行 - 三列布局，记录与工具靠右 -->
     <div class="toolbar-actions">
       <div class="action-col">
         <div class="action-col-title">商品管理</div>
@@ -53,7 +56,7 @@
           </ElButton>
         </div>
       </div>
-      <div class="action-col">
+      <div class="action-col action-col-right">
         <div class="action-col-title">记录与工具</div>
         <div class="action-col-btns">
           <ElButton @click="$emit('import-records')">
@@ -79,15 +82,15 @@
 import { useAppStore } from '../../../stores/app';
 
 defineProps<{
-  keyword: string;
+  name: string;
+  model: string;
   stockStatus: string;
-  productStatus: string;
 }>();
 
 defineEmits<{
-  'update:keyword': [val: string];
+  'update:name': [val: string];
+  'update:model': [val: string];
   'update:stockStatus': [val: string];
-  'update:productStatus': [val: string];
   search: [];
   reset: [];
   refresh: [];
@@ -131,8 +134,11 @@ const appStore = useAppStore();
 }
 
 .action-col {
-  flex: 1;
   min-width: 0;
+}
+
+.action-col-right {
+  margin-left: auto;
 }
 
 .action-col-title {

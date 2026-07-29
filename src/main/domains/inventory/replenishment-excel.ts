@@ -17,7 +17,7 @@ export async function generateReplenishmentExcel(lines: ReplenishmentPreviewLine
     { header: '型号', key: 'model', width: 20 },
     { header: '单位', key: 'unit', width: 10 },
     { header: '待补数量', key: 'quantity', width: 12 },
-    { header: '不含税单价', key: 'unitPrice', width: 15 },
+    { header: '含税单价', key: 'unitPrice', width: 15 },
     { header: '不含税金额', key: 'amount', width: 15 },
     { header: '税率', key: 'taxRate', width: 8 },
     { header: '税额', key: 'tax', width: 15 },

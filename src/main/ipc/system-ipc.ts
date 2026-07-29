@@ -23,11 +23,11 @@ function sanitizeText(text: string): string {
     // 脱敏银行账号（保留后 4 位）
     .replace(/银行账号[：:\s]*\d+(\d{4})/g, '银行账号: ****$1')
     .replace(/bank_account[：:\s]*\d+(\d{4})/g, 'bank_account: ****$1')
-    // 脱敏 S3 密钥
-    .replace(/AKIA[A-Z0-9]+/g, 'AKIA****')
-    .replace(/access[_-]?key[_-]?id[":\s]+["']?[^"',}\s]+/gi, 'access_key_id: ***')
-    .replace(/secret[_-]?access[_-]?key[":\s]+["']?[^"',}\s]+/gi, 'secret_access_key: ***')
-    .replace(/session[_-]?token[":\s]+["']?[^"',}\s]+/gi, 'session_token: ***')
+    // 脱敏腾讯云 COS 密钥
+    .replace(/AKID[A-Za-z0-9]+/g, 'AKID****')
+    .replace(/secret[_-]?id[":\s]+["']?[^"',}\s]+/gi, 'secret_id: ***')
+    .replace(/secret[_-]?key[":\s]+["']?[^"',}\s]+/gi, 'secret_key: ***')
+    .replace(/security[_-]?token[":\s]+["']?[^"',}\s]+/gi, 'security_token: ***')
     // 脱敏恢复密码
     .replace(/restore[_-]?password[":\s]+["']?[^"',}\s]+/gi, 'restore_password: ***');
 }
@@ -134,7 +134,7 @@ export function registerSystemIpc(): void {
 
     const report = [
       '========================================',
-      '发票库存管理系统 - 诊断包',
+      '成都莱盛发票库存管理工具 - 诊断包',
       '========================================',
       '',
       `生成时间: ${new Date().toISOString()}`,

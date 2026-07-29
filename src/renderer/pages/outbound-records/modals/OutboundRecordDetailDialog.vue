@@ -23,8 +23,6 @@
             <ElDescriptionsItem label="数量合计">{{ detail.batch.totalQuantity }}</ElDescriptionsItem>
             <ElDescriptionsItem label="明细行数">{{ detail.batch.lineCount }}</ElDescriptionsItem>
             <ElDescriptionsItem label="金额">{{ centToDisplay(detail.batch.totalAmountCent) }}</ElDescriptionsItem>
-            <ElDescriptionsItem label="税额">{{ centToDisplay(detail.batch.totalTaxCent) }}</ElDescriptionsItem>
-            <ElDescriptionsItem label="价税合计">{{ centToDisplay(detail.batch.totalCent) }}</ElDescriptionsItem>
           </ElDescriptions>
         </ElCard>
 
@@ -44,19 +42,13 @@
             <ElTableColumn prop="name" label="项目名称" min-width="150" />
             <ElTableColumn prop="model" label="型号" width="100" />
             <ElTableColumn prop="unit" label="单位" width="70" />
-            <ElTableColumn prop="unitPriceDecimal" label="单价" width="120" />
+            <ElTableColumn prop="unitPriceDecimal" label="含税单价" width="120" />
             <ElTableColumn prop="taxRate" label="税率" width="80">
               <template #default>0.13</template>
             </ElTableColumn>
             <ElTableColumn prop="quantity" label="数量" width="80" />
             <ElTableColumn label="金额" width="110">
               <template #default="{ row }">{{ centToDisplay(row.amountCent) }}</template>
-            </ElTableColumn>
-            <ElTableColumn label="税额" width="110">
-              <template #default="{ row }">{{ centToDisplay(row.taxCent) }}</template>
-            </ElTableColumn>
-            <ElTableColumn label="价税合计" width="120">
-              <template #default="{ row }">{{ centToDisplay(row.totalCent) }}</template>
             </ElTableColumn>
             <ElTableColumn label="扣减前库存 -> 扣减后库存" width="200" align="center">
               <template #default="{ row }">

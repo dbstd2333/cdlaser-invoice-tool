@@ -1,5 +1,8 @@
 <template>
   <div class="table-container">
+    <div class="table-options">
+      <ElCheckbox v-model="showTaxCode">显示税收分类编码列</ElCheckbox>
+    </div>
     <ElTable
       :data="rows"
       v-loading="loading"
@@ -14,19 +17,12 @@
       <ElTableColumn prop="name" label="项目名称" min-width="180" show-overflow-tooltip />
       <ElTableColumn prop="model" label="型号" width="120" show-overflow-tooltip />
       <ElTableColumn prop="unit" label="单位" width="80" />
-      <ElTableColumn prop="taxClassificationCode" label="税收分类编码" min-width="150" show-overflow-tooltip />
-      <ElTableColumn prop="unitPriceDecimal" label="不含税单价" width="130" />
+      <ElTableColumn v-if="showTaxCode" prop="taxClassificationCode" label="税收分类编码" min-width="150" show-overflow-tooltip />
+      <ElTableColumn prop="unitPriceDecimal" label="含税单价" width="130" />
       <ElTableColumn label="当前库存" width="120">
         <template #default="{ row }">
           <ElTag :type="stockTagType(row.stockBalance)" size="small">
             {{ stockStatusText(row.stockBalance) }}
-          </ElTag>
-        </template>
-      </ElTableColumn>
-      <ElTableColumn label="启用状态" width="90" align="center">
-        <template #default="{ row }">
-          <ElTag :type="row.productStatus === 'active' ? 'success' : 'danger'" size="small">
-            {{ row.productStatus === 'active' ? '启用' : '停用' }}
           </ElTag>
         </template>
       </ElTableColumn>
@@ -37,10 +33,8 @@
         <template #default="{ row }">
           <ElButton link type="info" size="small" @click="$emit('viewHistory', row)">历史记录</ElButton>
           <ElButton link type="primary" size="small" @click="$emit('editProduct', row)">编辑</ElButton>
-          <ElButton link :type="row.productStatus === 'active' ? 'warning' : 'success'" size="small" @click="$emit('toggleProductStatus', row)">
-            {{ row.productStatus === 'active' ? '停用' : '启用' }}
-          </ElButton>
           <ElButton link type="primary" size="small" @click="$emit('adjustStock', row)">库存调整</ElButton>
+          <ElButton link type="danger" size="small" @click="$emit('deleteProduct', row)">删除</ElButton>
         </template>
       </ElTableColumn>
     </ElTable>
@@ -74,9 +68,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   viewHistory: [row: PriceVersionRow];
   editProduct: [row: PriceVersionRow];
-  toggleProductStatus: [row: PriceVersionRow];
-  togglePriceVersionStatus: [row: PriceVersionRow];
   adjustStock: [row: PriceVersionRow];
+  deleteProduct: [row: PriceVersionRow];
   pageChange: [page: number];
   sizeChange: [size: number];
   selectionChange: [row: PriceVersionRow, selected: boolean];
@@ -91,6 +84,7 @@ const currentPageSize = computed({
   set: () => {},
 });
 
+const showTaxCode = ref(true);
 const tableMaxHeight = ref(550);
 
 function handleSelectionChange(selectedRows: PriceVersionRow[]): void {
@@ -119,3 +113,9 @@ function formatTime(iso: string): string {
   }
 }
 </script>
+
+<style scoped>
+.table-options {
+  padding: 0 0 8px;
+}
+</style>

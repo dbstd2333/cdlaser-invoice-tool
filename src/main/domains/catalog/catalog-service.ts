@@ -20,7 +20,6 @@ export {
 export {
   createProduct,
   updateProduct,
-  toggleProductStatus,
+  deleteProduct,
   createPriceVersion,
-  togglePriceVersionStatus,
 } from './catalog-crud';

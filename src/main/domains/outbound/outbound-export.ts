@@ -4,7 +4,7 @@ import { outboundBatches, outboundLines, priceVersions } from '../../db/schema/i
 import { eq } from 'drizzle-orm';
 import type { OutboundExportInput } from '@shared/schemas/index';
 import type { CustomerSnapshot } from '@shared/contracts/types';
-import { calcAmountCent, calcTaxCent, calcTotalCent, centToYuan, normalizeUnitPrice, TAX_RATE_DECIMAL } from '@shared/money/index';
+import { centToYuan, normalizeUnitPrice, calcOutboundAmountCent, scaleUnitPrice, OUTBOUND_AMOUNT_FACTOR, TAX_RATE_DECIMAL } from '@shared/money/index';
 import { trimInvisible, generateBatchNo, escapeFormulaInjection } from '@shared/contracts/normalize';
 import { recordAudit } from '../audit/audit-service';
 import { appendLedger } from '../inventory/ledger-service';
@@ -35,16 +35,17 @@ export async function executeOutboundExport(input: OutboundExportInput): Promise
   const customer = getCustomerById(input.customerId)!;
   // 按稳定顺序排列（priceVersionId 升序），确保库存扣减顺序确定
   const sortedLines = [...draft.validLines].sort((a, b) => a.priceVersionId.localeCompare(b.priceVersionId));
+  const amountFactor = input.amountFactor ?? OUTBOUND_AMOUNT_FACTOR;
 
   // 生成 XLSX
-  const taxLines = buildTaxLines(sortedLines);
+  const taxLines = buildTaxLines(sortedLines, amountFactor);
   const xlsxBuffer = await generateTaxTemplateXlsx(taxLines);
   await validateTaxTemplateXlsx(xlsxBuffer, sortedLines.length);
   const xlsxSha256 = computeSha256(xlsxBuffer);
   const xlsxBase64 = xlsxToBase64(xlsxBuffer);
 
   // 计算汇总
-  const totals = calculateTotals(sortedLines);
+  const totals = calculateTotals(sortedLines, amountFactor);
 
   const batchId = uuidv7();
   const batchNo = generateBatchNo('OUT');
@@ -62,7 +63,7 @@ export async function executeOutboundExport(input: OutboundExportInput): Promise
     }).run();
 
     for (const line of sortedLines) {
-      processOutboundLine(db, raw, batchId, batchNo, exportedAt, line);
+      processOutboundLine(db, raw, batchId, batchNo, exportedAt, line, amountFactor);
     }
 
     recordAudit({
@@ -77,9 +78,9 @@ export async function executeOutboundExport(input: OutboundExportInput): Promise
 }
 
 /** 构造税务模板行 */
-function buildTaxLines(lines: Array<{ priceVersionId: string; name: string; model: string; unit: string; unitPriceDecimal: string; quantity: number }>): TaxTemplateLine[] {
+function buildTaxLines(lines: Array<{ priceVersionId: string; name: string; model: string; unit: string; unitPriceDecimal: string; quantity: number }>, factor: string): TaxTemplateLine[] {
   return lines.map((l) => {
-    const amountCent = calcAmountCent(l.quantity, l.unitPriceDecimal);
+    const amountCent = calcOutboundAmountCent(l.quantity, l.unitPriceDecimal, factor);
     const pv = getPriceVersionById(l.priceVersionId)!;
     const product = getProductById(pv.productId)!;
     return {
@@ -88,7 +89,7 @@ function buildTaxLines(lines: Array<{ priceVersionId: string; name: string; mode
       model: escapeFormulaInjection(trimInvisible(l.model)),
       unit: escapeFormulaInjection(trimInvisible(l.unit)),
       quantity: l.quantity,
-      unitPriceDecimal: normalizeUnitPrice(l.unitPriceDecimal),
+      unitPriceDecimal: scaleUnitPrice(normalizeUnitPrice(l.unitPriceDecimal), factor),
       amountYuan: centToYuan(amountCent),
       taxRate: TAX_RATE_DECIMAL,
     };
@@ -96,19 +97,17 @@ function buildTaxLines(lines: Array<{ priceVersionId: string; name: string; mode
 }
 
 /** 计算汇总金额 */
-function calculateTotals(lines: Array<{ quantity: number; unitPriceDecimal: string }>): {
+function calculateTotals(lines: Array<{ quantity: number; unitPriceDecimal: string }>, factor: string): {
   totalQuantity: number; totalAmountCent: number; totalTaxCent: number; totalCent: number;
 } {
-  let totalQuantity = 0, totalAmountCent = 0, totalTaxCent = 0, totalCent = 0;
+  let totalQuantity = 0, totalAmountCent = 0, totalCent = 0;
   for (const line of lines) {
     totalQuantity += line.quantity;
-    const amountCent = calcAmountCent(line.quantity, line.unitPriceDecimal);
-    const taxCent = calcTaxCent(amountCent);
+    const amountCent = calcOutboundAmountCent(line.quantity, line.unitPriceDecimal, factor);
     totalAmountCent += amountCent;
-    totalTaxCent += taxCent;
-    totalCent += calcTotalCent(amountCent, taxCent);
+    totalCent += amountCent;
   }
-  return { totalQuantity, totalAmountCent, totalTaxCent, totalCent };
+  return { totalQuantity, totalAmountCent, totalTaxCent: 0, totalCent };
 }
 
 /** 处理单行：扣减库存、写明细、写流水 */
@@ -119,15 +118,14 @@ function processOutboundLine(
   batchNo: string,
   exportedAt: string,
   line: { priceVersionId: string; quantity: number; unitPriceDecimal: string; name: string },
+  factor: string,
 ): void {
   const pvRow = raw.prepare('SELECT stock_balance FROM price_versions WHERE id = ?').get(line.priceVersionId) as { stock_balance: number } | undefined;
   if (!pvRow) throw new Error(`价格版本 ${line.priceVersionId} 不存在`);
 
   const stockBefore = pvRow.stock_balance;
   const stockAfter = stockBefore - line.quantity;
-  const amountCent = calcAmountCent(line.quantity, line.unitPriceDecimal);
-  const taxCent = calcTaxCent(amountCent);
-  const lineTotal = calcTotalCent(amountCent, taxCent);
+  const amountCent = calcOutboundAmountCent(line.quantity, line.unitPriceDecimal, factor);
 
   const product = getProductById(getPriceVersionById(line.priceVersionId)!.productId)!;
 
@@ -136,7 +134,7 @@ function processOutboundLine(
     name: product.name, taxClassificationCode: product.taxClassificationCode,
     model: product.model, unit: product.unit,
     unitPriceDecimal: normalizeUnitPrice(line.unitPriceDecimal), taxRate: 13,
-    quantity: line.quantity, amountCent, taxCent, totalCent: lineTotal,
+    quantity: line.quantity, amountCent, taxCent: 0, totalCent: amountCent,
     stockBefore, stockAfter,
   }).run();
 

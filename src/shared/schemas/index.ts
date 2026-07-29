@@ -64,6 +64,8 @@ export const priceVersionCreateSchema = z.object({
 /** 商品价格版本查询 */
 export const priceVersionQuerySchema = z.object({
   keyword: z.string().optional(),
+  name: z.string().optional(),
+  model: z.string().optional(),
   stockStatus: z.enum(['positive', 'zero', 'negative', 'all']).optional(),
   dataStatus: z.enum(['complete', 'incomplete', 'all']).optional(),
   productStatus: z.enum(['active', 'inactive', 'all']).optional(),
@@ -83,6 +85,7 @@ export const outboundLineInputSchema = z.object({
 export const outboundExportSchema = z.object({
   customerId: z.string().min(1),
   lines: z.array(outboundLineInputSchema).min(1, '至少选择一行').max(2000, '单次最多 2000 条明细'),
+  amountFactor: z.string().optional(),
 });
 
 /** 开票记录查询 */
@@ -137,17 +140,14 @@ export const voidRequestSchema = z.object({
   reason: z.string().min(1, '作废原因必填'),
 });
 
-/** S3 配置 */
-export const s3ConfigSchema = z.object({
-  serviceType: z.enum(['aws', 'compatible']),
-  endpoint: z.string().optional(),
-  region: z.string().min(1),
-  bucket: z.string().min(1),
+/** 腾讯云 COS 配置 */
+export const cosConfigSchema = z.object({
+  region: z.string().trim().min(1, 'Region 必填'),
+  bucket: z.string().trim().regex(/^[a-z0-9][a-z0-9.-]*-\d+$/, 'Bucket 格式应为 BucketName-APPID'),
   prefix: z.string().optional(),
-  accessKeyId: z.string().optional(),
-  secretAccessKey: z.string().optional(),
-  sessionToken: z.string().optional(),
-  pathStyle: z.boolean().optional(),
+  secretId: z.string().optional(),
+  secretKey: z.string().optional(),
+  securityToken: z.string().optional(),
   autoBackup: z.boolean().optional(),
   retentionCount: z.number().int().min(1).max(100).optional(),
   restorePassword: z.string().optional(),
@@ -171,6 +171,6 @@ export type InboundConfirmInput = z.infer<typeof inboundConfirmSchema>;
 export type InventoryAdjustInput = z.infer<typeof inventoryAdjustSchema>;
 export type LedgerQueryInput = z.infer<typeof ledgerQuerySchema>;
 export type FieldHistoryQueryInput = z.infer<typeof fieldHistoryQuerySchema>;
-export type S3ConfigInput = z.infer<typeof s3ConfigSchema>;
+export type CosConfigInput = z.infer<typeof cosConfigSchema>;
 export type RestoreInput = z.infer<typeof restoreRequestSchema>;
 export type SelectFileInput = z.infer<typeof selectFileSchema>;

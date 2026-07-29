@@ -6,7 +6,7 @@
     size="720px"
     :before-close="handleClose"
   >
-    <S3BackupPanel v-if="visible" />
+    <CosBackupPanel v-if="visible" />
     <ElCard shadow="never" class="diagnostics-card">
       <template #header>系统诊断</template>
       <ElButton :loading="exporting" @click="handleExportDiagnostics">导出诊断包</ElButton>
@@ -19,7 +19,7 @@
 import { ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useAppStore } from '../../stores/app';
-import S3BackupPanel from './S3BackupPanel.vue';
+import CosBackupPanel from './CosBackupPanel.vue';
 import { api } from '../../api';
 
 const appStore = useAppStore();

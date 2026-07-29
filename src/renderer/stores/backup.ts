@@ -1,11 +1,11 @@
 import { defineStore } from 'pinia';
 import { ref, reactive } from 'vue';
 import { api } from '../api';
-import type { BackupStatus, BackupHistoryItem, S3Config } from '@shared/contracts/preview-types';
+import type { BackupStatus, BackupHistoryItem, CosConfig } from '@shared/contracts/preview-types';
 
 /**
- * 备份 Store - 管理 S3 配置、备份状态和备份历史。
- * Secret Access Key、Session Token 和恢复密码不写入持久化状态。
+ * 备份 Store - 管理腾讯云 COS 配置、备份状态和备份历史。
+ * SecretKey、SecurityToken 和恢复密码不写入持久化状态。
  */
 export const useBackupStore = defineStore('backup', () => {
   const status = ref<BackupStatus>({
@@ -17,16 +17,13 @@ export const useBackupStore = defineStore('backup', () => {
     credentialConfigured: false,
   });
 
-  const config = reactive<S3Config>({
-    serviceType: 'aws',
-    endpoint: '',
+  const config = reactive<CosConfig>({
     region: '',
     bucket: '',
     prefix: '',
-    accessKeyId: '',
-    secretAccessKey: '',
-    sessionToken: '',
-    pathStyle: false,
+    secretId: '',
+    secretKey: '',
+    securityToken: '',
     autoBackup: true,
     retentionCount: 30,
     restorePassword: '',
@@ -49,7 +46,7 @@ export const useBackupStore = defineStore('backup', () => {
 
   async function saveConfig(): Promise<void> {
     await api.backup.saveConfig(config);
-    credentialConfigured.value = !!(config.accessKeyId && config.secretAccessKey);
+    credentialConfigured.value = !!(config.secretId && config.secretKey);
   }
 
   async function testConnection(): Promise<{ success: boolean; message: string }> {

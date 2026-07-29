@@ -24,10 +24,13 @@
             <ElOption v-for="c in customerOptions" :key="c.id" :label="`${c.name} (${c.taxId})`" :value="c.id" />
           </ElSelect>
         </ElFormItem>
+        <ElFormItem label="金额系数">
+          <ElInput v-model="amountFactor" style="width: 120px" placeholder="1.09" />
+        </ElFormItem>
       </ElForm>
 
       <!-- 商品明细和汇总 -->
-      <OutboundLineTable :lines="lines" @change="recalculate" @remove="removeLine" />
+      <OutboundLineTable :lines="lines" :factor="amountFactor" @change="recalculate" @remove="removeLine" />
     </div>
 
     <template #footer>
@@ -57,6 +60,7 @@ const selectedCustomerId = ref('');
 const customerOptions = ref<Customer[]>([]);
 const customerLoading = ref(false);
 const exporting = ref(false);
+const amountFactor = ref('1.09');
 
 interface OutboundLine {
   priceVersionId: string; name: string; model: string; unit: string;
@@ -115,6 +119,7 @@ async function handleExport(): Promise<void> {
     const input = {
       customerId: selectedCustomerId.value,
       lines: lines.map((l) => ({ priceVersionId: l.priceVersionId, quantity: l.quantity })),
+      amountFactor: amountFactor.value,
     };
 
     const draft: DraftValidationResult = await api.outbound.validateDraft(input);

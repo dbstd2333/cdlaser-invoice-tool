@@ -1,7 +1,7 @@
 <template>
-  <div class="s3-panel">
+  <div class="cos-panel">
     <BackupStatusCard />
-    <S3ConnectionForm />
+    <CosConnectionForm />
     <BackupPolicyForm />
     <div class="action-buttons">
       <ElButton @click="handleSaveConfig">保存配置</ElButton>
@@ -21,7 +21,7 @@
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import BackupStatusCard from './BackupStatusCard.vue';
-import S3ConnectionForm from './S3ConnectionForm.vue';
+import CosConnectionForm from './CosConnectionForm.vue';
 import BackupPolicyForm from './BackupPolicyForm.vue';
 import BackupHistoryTable from './BackupHistoryTable.vue';
 import RestoreBackupDialog from './RestoreBackupDialog.vue';
@@ -83,7 +83,7 @@ function handleRestoreSuccess(): void {
 </script>
 
 <style scoped>
-.s3-panel {
+.cos-panel {
   display: flex;
   flex-direction: column;
   gap: 20px;

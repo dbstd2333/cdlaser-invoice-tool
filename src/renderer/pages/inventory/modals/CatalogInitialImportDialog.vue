@@ -11,7 +11,7 @@
     <div class="import-content">
       <div v-if="step === 'select'" class="step-content">
         <ElAlert type="info" :closable="false" show-icon>
-          下载系统模板，填写商品、型号、单位、税收分类编码、单价和初始库存。初始库存允许正数、0 或负数。
+          下载系统模板，填写商品、型号、单位、税收分类编码、含税单价和初始库存。初始库存允许正数、0 或负数。
         </ElAlert>
         <div class="file-actions">
           <ElButton @click="handleDownloadTemplate">下载模板</ElButton>
@@ -36,7 +36,7 @@
           <ElTableColumn prop="model" label="型号" width="100" />
           <ElTableColumn prop="unit" label="单位" width="70" />
           <ElTableColumn prop="taxClassificationCode" label="税收编码" min-width="130" />
-          <ElTableColumn prop="unitPriceDecimal" label="单价" width="110" />
+          <ElTableColumn prop="unitPriceDecimal" label="含税单价" width="110" />
           <ElTableColumn prop="initialStock" label="初始库存" width="90" />
           <ElTableColumn label="状态" width="80">
             <template #default="{ row }">

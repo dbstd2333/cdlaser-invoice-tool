@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   normalizeUnitPrice,
+  taxExclusiveUnitPrice,
   calcAmountCent,
+  calcOutboundAmountCent,
+  scaleUnitPrice,
   calcTaxCent,
   calcTotalCent,
   centToYuan,
@@ -13,6 +16,7 @@ import {
 
 /**
  * 金额计算单元测试 - 验证 decimal.js 精度计算。
+ * 单价均为含税单价，不含税金额由含税单价 ÷ 1.13 反推。
  */
 describe('金额计算', () => {
   describe('normalizeUnitPrice', () => {
@@ -37,22 +41,64 @@ describe('金额计算', () => {
     });
   });
 
+  describe('taxExclusiveUnitPrice', () => {
+    it('应将含税单价反推为不含税单价', () => {
+      // 113 ÷ 1.13 = 100
+      expect(taxExclusiveUnitPrice('113')).toBe('100');
+      // 1.13 ÷ 1.13 = 1
+      expect(taxExclusiveUnitPrice('1.13')).toBe('1');
+    });
+
+    it('应四舍五入到 13 位小数', () => {
+      // 100.5 ÷ 1.13 = 88.93805309734513... -> 88.9380530973451
+      expect(taxExclusiveUnitPrice('100.5')).toBe('88.9380530973451');
+    });
+  });
+
   describe('calcAmountCent', () => {
-    it('应正确计算金额（分）= 数量 × 单价', () => {
-      // 10 × 100.5 = 1005.00 -> 100500 分
-      expect(calcAmountCent(10, '100.5')).toBe(100500);
+    it('应正确计算不含税金额（分）= 数量 ×（含税单价 ÷ 1.13）', () => {
+      // 含税 113 ÷ 1.13 = 100，10 × 100 = 1000.00 -> 100000 分
+      expect(calcAmountCent(10, '113')).toBe(100000);
     });
 
     it('应四舍五入到 2 位', () => {
-      // 3 × 0.333 = 0.999 -> 1.00 -> 100 分
-      expect(calcAmountCent(3, '0.333')).toBe(100);
-      // 2 × 0.125 = 0.25 -> 25 分
-      expect(calcAmountCent(2, '0.125')).toBe(25);
+      // 含税 1.13 ÷ 1.13 = 1，3 × 1 = 3.00 -> 300 分
+      expect(calcAmountCent(3, '1.13')).toBe(300);
+      // 含税 1.13 ÷ 1.13 = 1，2 × 1 = 2.00 -> 200 分
+      expect(calcAmountCent(2, '1.13')).toBe(200);
     });
 
-    it('应处理高精度单价', () => {
-      // 1 × 0.1234567890123 = 0.1234567890123 -> 0.12 -> 12 分
-      expect(calcAmountCent(1, '0.1234567890123')).toBe(12);
+    it('应处理高精度含税单价', () => {
+      // 含税 100.5 ÷ 1.13 = 88.9380530973451，10 × 88.9380530973451 = 889.38 -> 88938 分
+      expect(calcAmountCent(10, '100.5')).toBe(88938);
+    });
+  });
+
+  describe('calcOutboundAmountCent', () => {
+    it('应按系数计算金额 = 含税单价 × 数量 × 系数', () => {
+      // 含税 100 × 10 × 1.09 = 1090.00 -> 109000 分
+      expect(calcOutboundAmountCent(10, '100', '1.09')).toBe(109000);
+    });
+
+    it('默认系数 1.09', () => {
+      expect(calcOutboundAmountCent(10, '100')).toBe(109000);
+    });
+
+    it('应四舍五入到 2 位', () => {
+      // 含税 1.13 × 3 × 1.09 = 3.6951 -> 3.70 -> 370 分
+      expect(calcOutboundAmountCent(3, '1.13', '1.09')).toBe(370);
+    });
+  });
+
+  describe('scaleUnitPrice', () => {
+    it('应将单价乘以系数', () => {
+      // 100 × 1.09 = 109
+      expect(scaleUnitPrice('100', '1.09')).toBe('109');
+    });
+
+    it('应保留 13 位小数', () => {
+      // 1.13 × 1.09 = 1.2317
+      expect(scaleUnitPrice('1.13', '1.09')).toBe('1.2317');
     });
   });
 
@@ -102,18 +148,18 @@ describe('金额计算', () => {
   });
 
   describe('销项开票金额全链路', () => {
-    it('应正确计算完整开票金额', () => {
-      // 数量 100，单价 99.99
+    it('应正确计算完整开票金额（含税单价倒推不含税）', () => {
+      // 数量 100，含税单价 99.99（价税合计 9999.00）
       const quantity = 100;
       const unitPrice = '99.99';
-      const amountCent = calcAmountCent(quantity, unitPrice); // 9999.00 -> 999900
-      const taxCent = calcTaxCent(amountCent); // 999900 × 0.13 = 129987
-      const totalCent = calcTotalCent(amountCent, taxCent); // 1129887
+      const amountCent = calcAmountCent(quantity, unitPrice); // 99.99÷1.13=88.4867… ×100 = 8848.67 -> 884867
+      const taxCent = calcTaxCent(amountCent); // 884867 × 0.13 = 115032.71 -> 115033
+      const totalCent = calcTotalCent(amountCent, taxCent); // 884867 + 115033 = 999900
 
-      expect(amountCent).toBe(999900);
-      expect(taxCent).toBe(129987);
-      expect(totalCent).toBe(1129887);
-      expect(centToYuan(totalCent)).toBe('11298.87');
+      expect(amountCent).toBe(884867);
+      expect(taxCent).toBe(115033);
+      expect(totalCent).toBe(999900);
+      expect(centToYuan(totalCent)).toBe('9999.00');
     });
   });
 });

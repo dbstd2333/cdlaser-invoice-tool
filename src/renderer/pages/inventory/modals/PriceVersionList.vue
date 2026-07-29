@@ -5,29 +5,15 @@
       <ElButton type="primary" size="small" @click="showAddPrice = true">新增价格版本</ElButton>
     </div>
     <ElTable :data="priceVersions" border size="small">
-      <ElTableColumn prop="unitPriceDecimal" label="不含税单价" />
+      <ElTableColumn prop="unitPriceDecimal" label="含税单价" />
       <ElTableColumn prop="taxRate" label="税率" width="80" />
       <ElTableColumn prop="stockBalance" label="当前库存" width="100" />
-      <ElTableColumn label="状态" width="80">
-        <template #default="{ row }">
-          <ElTag :type="row.status === 'active' ? 'success' : 'danger'" size="small">
-            {{ row.status === 'active' ? '启用' : '停用' }}
-          </ElTag>
-        </template>
-      </ElTableColumn>
-      <ElTableColumn label="操作" width="100">
-        <template #default="{ row }">
-          <ElButton link :type="row.status === 'active' ? 'warning' : 'success'" size="small" @click="togglePvStatus(row.id)">
-            {{ row.status === 'active' ? '停用' : '启用' }}
-          </ElButton>
-        </template>
-      </ElTableColumn>
     </ElTable>
 
     <!-- 新增价格版本 Dialog -->
     <ElDialog v-model="showAddPrice" title="新增价格版本" width="400px" append-to-body>
       <ElForm label-width="120px">
-        <ElFormItem label="不含税单价" required>
+        <ElFormItem label="含税单价" required>
           <ElInput v-model="newPrice" placeholder="最多 13 位小数" />
         </ElFormItem>
       </ElForm>
@@ -74,16 +60,6 @@ async function handleAddPriceVersion(): Promise<void> {
     emit('reload');
   } catch (err) {
     ElMessage.error(`创建失败: ${(err as Error).message}`);
-  }
-}
-
-/** 切换价格版本状态 */
-async function togglePvStatus(id: string): Promise<void> {
-  try {
-    await api.catalog.togglePriceVersionStatus(id);
-    await loadPriceVersions();
-  } catch (err) {
-    ElMessage.error(`操作失败: ${(err as Error).message}`);
   }
 }
 

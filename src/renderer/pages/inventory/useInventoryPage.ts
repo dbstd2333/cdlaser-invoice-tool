@@ -18,9 +18,9 @@ export function useInventoryPage() {
   const showSelected = ref(false);
 
   const query = reactive({
-    keyword: '',
+    name: '',
+    model: '',
     stockStatus: 'all' as 'all' | 'positive' | 'zero' | 'negative',
-    productStatus: 'all' as 'all' | 'active' | 'inactive',
     page: 1,
     pageSize: 50,
   });
@@ -51,7 +51,7 @@ export function useInventoryPage() {
   }
 
   function handleSearch(): void { query.page = 1; loadData(); }
-  function handleReset(): void { query.keyword = ''; query.stockStatus = 'all'; query.productStatus = 'all'; query.page = 1; loadData(); }
+  function handleReset(): void { query.name = ''; query.model = ''; query.stockStatus = 'all'; query.page = 1; loadData(); }
   function handlePageChange(page: number): void { query.page = page; loadData(); }
   function handleSizeChange(size: number): void { query.pageSize = size; query.page = 1; loadData(); }
 
@@ -77,18 +77,11 @@ export function useInventoryPage() {
     modalType.value = 'history';
   }
 
-  async function handleToggleProductStatus(row: PriceVersionRow): Promise<void> {
+  async function handleDeleteProduct(row: PriceVersionRow): Promise<void> {
     try {
-      await ElMessageBox.confirm(`确认${row.productStatus === 'active' ? '停用' : '启用'}商品「${row.name}」？`, '确认操作', { type: 'warning' });
-      await api.catalog.toggleProductStatus(row.productId); ElMessage.success('操作成功'); loadData();
-    } catch (err) { if (err !== 'cancel') ElMessage.error(`操作失败: ${(err as Error).message}`); }
-  }
-
-  async function handleTogglePriceVersionStatus(row: PriceVersionRow): Promise<void> {
-    try {
-      await ElMessageBox.confirm('确认切换价格版本状态？', '确认操作', { type: 'warning' });
-      await api.catalog.togglePriceVersionStatus(row.priceVersionId); ElMessage.success('操作成功'); loadData();
-    } catch (err) { if (err !== 'cancel') ElMessage.error(`操作失败: ${(err as Error).message}`); }
+      await ElMessageBox.confirm(`确认删除商品「${row.name} ${row.model}」？删除后不可恢复。`, '确认删除', { type: 'warning' });
+      await api.catalog.deleteProduct(row.productId); ElMessage.success('删除成功'); loadData();
+    } catch (err) { if (err !== 'cancel') ElMessage.error(`删除失败: ${(err as Error).message}`); }
   }
 
   function handleClearSelection(): void { selectionStore.clearSelection(); showSelected.value = false; }
@@ -105,7 +98,7 @@ export function useInventoryPage() {
     loadData, handleSearch, handleReset, handlePageChange, handleSizeChange,
     handleSelectionChange, handleOutbound, handleAddProduct, handleEditProduct,
     handleViewHistory, handleAdjustStock, handleViewHistoryGlobal,
-    handleToggleProductStatus, handleTogglePriceVersionStatus, handleClearSelection, handleImportSuccess,
+    handleDeleteProduct, handleClearSelection, handleImportSuccess,
     handleInitialImport: () => { initialImportVisible.value = true; },
     handleDailyImport: () => { dailyImportVisible.value = true; },
     handleMonthEndExport: () => { replenishmentVisible.value = true; },
