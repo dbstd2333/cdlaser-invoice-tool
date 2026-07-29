@@ -13,11 +13,11 @@
   border-radius: var(--card-radius);
 }
 
-.detail-content[data-v-aa0deaa6] { display: flex; flex-direction: column; gap: 16px;
+.detail-content[data-v-f443ad84] { display: flex; flex-direction: column; gap: 16px;
 }
-.summary-card[data-v-aa0deaa6] { margin-bottom: 0;
+.summary-card[data-v-f443ad84] { margin-bottom: 0;
 }
-.void-card[data-v-aa0deaa6] { border-color: var(--color-negative);
+.void-card[data-v-f443ad84] { border-color: var(--color-negative);
 }
-.arrow[data-v-aa0deaa6] { color: var(--text-secondary); margin: 0 4px;
+.arrow[data-v-f443ad84] { color: var(--text-secondary); margin: 0 4px;
 }

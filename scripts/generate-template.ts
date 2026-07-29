@@ -1,4 +1,4 @@
-import ExcelJS from 'exceljs';
+import XlsxPopulate from 'xlsx-populate';
 import { resolve } from 'node:path';
 import { mkdirSync, existsSync } from 'node:fs';
 
@@ -14,47 +14,42 @@ async function generateTemplate(): Promise<void> {
   }
   const filePath = resolve(dir, '发票开具项目信息导入模板.xlsx');
 
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = '成都莱盛发票库存管理工具';
-  workbook.created = new Date();
+  const wb = await XlsxPopulate.fromBlankAsync();
+  const detailSheet = wb.addSheet('1-明细模板');
+  wb.deleteSheet('Sheet1');
 
-  // 明细模板工作表
-  const detailSheet = workbook.addWorksheet('1-明细模板');
   // 第 1 行：标题
-  detailSheet.getCell('A1').value = '发票开具项目信息导入模板';
-  detailSheet.getCell('A1').font = { bold: true, size: 14 };
+  detailSheet.cell('A1').value('发票开具项目信息导入模板');
+  detailSheet.cell('A1').style('bold', true);
+  detailSheet.cell('A1').style('fontSize', 14);
   // 第 2 行：版本信息
-  detailSheet.getCell('A2').value = 'excelVersion: 1.0';
+  detailSheet.cell('A2').value('excelVersion: 1.0');
   // 第 3 行：表头
   const headers = ['项目名称', '税收分类编码', '规格型号', '单位', '数量', '单价', '金额', '税率'];
-  for (let i = 0; i < headers.length; i++) {
-    detailSheet.getCell(3, i + 1).value = headers[i];
-    detailSheet.getCell(3, i + 1).font = { bold: true };
-    detailSheet.getCell(3, i + 1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFE0E0E0' },
-    };
-  }
-  // 设置列宽
-  detailSheet.columns = [
-    { width: 30 }, { width: 20 }, { width: 20 }, { width: 10 },
-    { width: 12 }, { width: 15 }, { width: 15 }, { width: 10 },
-  ];
+  const colWidths = [30, 20, 20, 10, 12, 15, 15, 10];
+  headers.forEach((h, i) => {
+    const col = i + 1;
+    detailSheet.column(col).width(colWidths[i]);
+    const cell = detailSheet.cell(3, col);
+    cell.value(h);
+    cell.style('bold', true);
+    cell.style('fill', 'E0E0E0');
+  });
 
   // 其他 3 个工作表（隐藏数据/版本信息/说明）
-  const hiddenSheet = workbook.addWorksheet('隐藏数据', { state: 'hidden' });
-  hiddenSheet.getCell('A1').value = 'hidden config data';
+  const hiddenSheet = wb.addSheet('隐藏数据');
+  hiddenSheet.cell('A1').value('hidden config data');
+  hiddenSheet.hidden(true);
 
-  const versionSheet = workbook.addWorksheet('版本信息');
-  versionSheet.getCell('A1').value = 'excelVersion';
-  versionSheet.getCell('B1').value = '1.0';
+  const versionSheet = wb.addSheet('版本信息');
+  versionSheet.cell('A1').value('excelVersion');
+  versionSheet.cell('B1').value('1.0');
 
-  const instructionSheet = workbook.addWorksheet('说明');
-  instructionSheet.getCell('A1').value = '从第 4 行开始写入明细数据';
-  instructionSheet.getCell('A2').value = '税率固定为 0.13';
+  const instructionSheet = wb.addSheet('说明');
+  instructionSheet.cell('A1').value('从第 4 行开始写入明细数据');
+  instructionSheet.cell('A2').value('税率固定为 0.13');
 
-  await workbook.xlsx.writeFile(filePath);
+  await wb.toFileAsync(filePath);
   console.log(`税务模板已生成: ${filePath}`);
 }
 

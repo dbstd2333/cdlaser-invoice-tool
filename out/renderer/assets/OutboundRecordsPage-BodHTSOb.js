@@ -1,7 +1,7 @@
 import { r as ElCard, t as ElDatePicker } from "./css-D6NkufY2.js";
 import { Bi as createVNode, Ca as reactive, Fi as createBlock, G as ElInput, Ii as createCommentVNode, Ka as toDisplayString, Li as createElementBlock, M as ElButton, Na as unref, Ni as computed, Oi as withModifiers, Pi as createBaseVNode, S as ElOption, Ta as ref, Ua as normalizeClass, Vi as defineComponent, _ as ElDescriptions, a as vLoading, c as ElTableColumn, d as ElDialog, ea as onMounted, ga as withDirectives, ha as withCtx, i as ElMessage, k as ElTag, n as api, pa as watch, r as ElMessageBox, ra as openBlock, s as ElTable, t as _plugin_vue_export_helper_default, u as ElPagination, v as ElDescriptionsItem, w as ElSelect, zi as createTextVNode } from "./css-C8sLGSMG.js";
 import "./css-DSzxzpYd.js";
-import { i as centToDisplay } from "./money-DRED0fdN.js";
+import { n as centToDisplay } from "./money-DetyPBwL.js";
 //#region src/renderer/pages/outbound-records/components/OutboundRecordsToolbar.vue?vue&type=script&setup=true&lang.ts
 var _hoisted_1$3 = { class: "outbound-toolbar" };
 var _hoisted_2$1 = { class: "toolbar-filters" };
@@ -434,14 +434,6 @@ var OutboundRecordDetailDialog_default = /*#__PURE__*/ _plugin_vue_export_helper
 								createVNode(_component_ElDescriptionsItem, { label: "金额" }, {
 									default: withCtx(() => [createTextVNode(toDisplayString(unref(centToDisplay)(detail.value.batch.totalAmountCent)), 1)]),
 									_: 1
-								}),
-								createVNode(_component_ElDescriptionsItem, { label: "税额" }, {
-									default: withCtx(() => [createTextVNode(toDisplayString(unref(centToDisplay)(detail.value.batch.totalTaxCent)), 1)]),
-									_: 1
-								}),
-								createVNode(_component_ElDescriptionsItem, { label: "价税合计" }, {
-									default: withCtx(() => [createTextVNode(toDisplayString(unref(centToDisplay)(detail.value.batch.totalCent)), 1)]),
-									_: 1
 								})
 							]),
 							_: 1
@@ -501,7 +493,7 @@ var OutboundRecordDetailDialog_default = /*#__PURE__*/ _plugin_vue_export_helper
 								}),
 								createVNode(_component_ElTableColumn, {
 									prop: "unitPriceDecimal",
-									label: "单价",
+									label: "含税单价",
 									width: "120"
 								}),
 								createVNode(_component_ElTableColumn, {
@@ -522,20 +514,6 @@ var OutboundRecordDetailDialog_default = /*#__PURE__*/ _plugin_vue_export_helper
 									width: "110"
 								}, {
 									default: withCtx(({ row }) => [createTextVNode(toDisplayString(unref(centToDisplay)(row.amountCent)), 1)]),
-									_: 1
-								}),
-								createVNode(_component_ElTableColumn, {
-									label: "税额",
-									width: "110"
-								}, {
-									default: withCtx(({ row }) => [createTextVNode(toDisplayString(unref(centToDisplay)(row.taxCent)), 1)]),
-									_: 1
-								}),
-								createVNode(_component_ElTableColumn, {
-									label: "价税合计",
-									width: "120"
-								}, {
-									default: withCtx(({ row }) => [createTextVNode(toDisplayString(unref(centToDisplay)(row.totalCent)), 1)]),
 									_: 1
 								}),
 								createVNode(_component_ElTableColumn, {
@@ -560,7 +538,7 @@ var OutboundRecordDetailDialog_default = /*#__PURE__*/ _plugin_vue_export_helper
 			}, 8, ["modelValue"]);
 		};
 	}
-}), [["__scopeId", "data-v-aa0deaa6"]]);
+}), [["__scopeId", "data-v-f443ad84"]]);
 //#endregion
 //#region src/renderer/pages/outbound-records/OutboundRecordsPage.vue?vue&type=script&setup=true&lang.ts
 var _hoisted_1 = { class: "content-card" };

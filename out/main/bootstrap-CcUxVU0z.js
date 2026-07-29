@@ -41,8 +41,8 @@ let drizzle_orm_sqlite_core = require("drizzle-orm/sqlite-core");
 let zod = require("zod");
 let uuid = require("uuid");
 let drizzle_orm = require("drizzle-orm");
-let exceljs = require("exceljs");
-exceljs = __toESM(exceljs);
+let xlsx_populate = require("xlsx-populate");
+xlsx_populate = __toESM(xlsx_populate);
 let node_fs_promises = require("node:fs/promises");
 let decimal_js = require("decimal.js");
 decimal_js = __toESM(decimal_js);
@@ -1774,15 +1774,56 @@ function confirmCustomerInitialImport(token) {
 }
 //#endregion
 //#region src/main/excel/importers/parser-utils.ts
-/**
-* Excel 解析共享工具。
-* 按表头定位列，文本字段去首尾空白，禁止自动转数字。
-*/
+var XpCell = class {
+	value;
+	col;
+	constructor(value, col) {
+		this.value = value;
+		this.col = col;
+	}
+	get result() {
+		return this.value;
+	}
+};
+var XpRow = class {
+	values;
+	rowNumber;
+	constructor(values, rowNumber) {
+		this.values = values;
+		this.rowNumber = rowNumber;
+	}
+	getCell(col) {
+		return new XpCell((col >= 1 && col <= this.values.length ? this.values[col - 1] : null) ?? null, col);
+	}
+	eachCell(callback, includeEmpty = false) {
+		for (let c = 1; c <= this.values.length; c++) {
+			const v = this.values[c - 1];
+			if (!includeEmpty && (v == null || v === "")) continue;
+			callback(new XpCell(v ?? null, c), c);
+		}
+	}
+};
+var XpSheet = class {
+	sheet;
+	matrix;
+	constructor(sheet) {
+		this.sheet = sheet;
+		const used = this.sheet.usedRange ? this.sheet.usedRange() : null;
+		this.matrix = used ? used.value() : [];
+	}
+	get name() {
+		return this.sheet.name();
+	}
+	get rowCount() {
+		return this.matrix.length;
+	}
+	getRow(row) {
+		return new XpRow(row >= 1 && row <= this.matrix.length ? this.matrix[row - 1] : [], row);
+	}
+};
 /** 读取工作簿 */
 async function readWorkbook(filePath) {
-	const workbook = new exceljs.default.Workbook();
-	await workbook.xlsx.readFile(filePath);
-	return workbook;
+	return { worksheets: (await xlsx_populate.default.fromFileAsync(filePath)).sheets().map((s) => new XpSheet(s)) };
 }
 /** 将单元格值转为文本，避免数字精度丢失 */
 function cellToText(cell) {
@@ -1792,6 +1833,7 @@ function cellToText(cell) {
 	if (typeof val === "string") return val;
 	if (typeof val === "number") return String(val);
 	if (val instanceof Date) return val.toISOString().split("T")[0];
+	if (typeof val === "boolean") return val ? "TRUE" : "FALSE";
 	if (typeof val === "object") {
 		if ("richText" in val) return val.richText.map((r) => r.text).join("");
 		if ("text" in val) return String(val.text);
@@ -1824,14 +1866,14 @@ function cellToInt(cell) {
 /** 按表头名称查找列索引 */
 function findColumnIndex(headerRow, names) {
 	let foundCol = -1;
-	headerRow.eachCell({ includeEmpty: true }, (cell) => {
+	headerRow.eachCell((cell, col) => {
 		if (foundCol > 0) return;
 		const headerText = trimInvisible(cellToText(cell)).toLowerCase();
 		for (const name of names) if (headerText === name.toLowerCase() || headerText.includes(name.toLowerCase())) {
-			foundCol = Number(cell.col);
+			foundCol = col;
 			return;
 		}
-	});
+	}, true);
 	return foundCol;
 }
 //#endregion
@@ -2063,193 +2105,128 @@ function parseInboundSheet(sheet, sheetName, colMap, allRows) {
 //#region src/main/excel/importers/template-generator.ts
 /**
 * 导入模板生成器 - 生成客户、商品和进项的下载模板。
+* 基于 xlsx-populate（纯 JS，对 Node 32 友好）。
 */
+var TEXT_FORMAT = "@";
+/** 创建空白工作簿并移除默认 Sheet1，返回指定名称的工作表 */
+async function withSheet(name) {
+	const wb = await xlsx_populate.default.fromBlankAsync();
+	const sheet = wb.addSheet(name);
+	wb.deleteSheet("Sheet1");
+	return {
+		wb,
+		sheet
+	};
+}
+/** 写入表头：加粗，可选居中，并设置列宽 */
+function writeHeaders(sheet, headers, widths, align = false) {
+	headers.forEach((h, i) => {
+		const col = i + 1;
+		sheet.column(col).width(widths[i]);
+		const cell = sheet.cell(1, col);
+		cell.value(h);
+		cell.style("bold", true);
+		if (align) {
+			cell.style("verticalAlignment", "middle");
+			cell.style("horizontalAlignment", "center");
+		}
+	});
+}
 /** 生成客户导入模板并保存到指定路径 */
 async function generateCustomerTemplate(savePath) {
-	const workbook = new exceljs.default.Workbook();
-	const sheet = workbook.addWorksheet("客户信息");
-	sheet.columns = [
-		{
-			header: "客户名称",
-			key: "name",
-			width: 30
-		},
-		{
-			header: "纳税人识别号",
-			key: "taxId",
-			width: 25
-		},
-		{
-			header: "简码",
-			key: "shortCode",
-			width: 15
-		},
-		{
-			header: "地址",
-			key: "address",
-			width: 40
-		},
-		{
-			header: "电话",
-			key: "phone",
-			width: 15
-		},
-		{
-			header: "开户行名称",
-			key: "bankName",
-			width: 25
-		},
-		{
-			header: "银行账号",
-			key: "bankAccount",
-			width: 25
-		},
-		{
-			header: "联系邮箱",
-			key: "email",
-			width: 25
-		},
-		{
-			header: "是否默认地址",
-			key: "isDefaultAddress",
-			width: 15
-		}
-	];
-	sheet.getRow(1).font = { bold: true };
-	for (const column of [
+	const { wb, sheet } = await withSheet("客户信息");
+	writeHeaders(sheet, [
+		"客户名称",
+		"纳税人识别号",
+		"简码",
+		"地址",
+		"电话",
+		"开户行名称",
+		"银行账号",
+		"联系邮箱",
+		"是否默认地址"
+	], [
+		30,
+		25,
+		15,
+		40,
+		15,
+		25,
+		25,
+		25,
+		15
+	]);
+	for (const col of [
 		2,
 		5,
 		7
-	]) sheet.getColumn(column).numFmt = "@";
-	await workbook.xlsx.writeFile(savePath);
+	]) sheet.column(col).style("numberFormat", TEXT_FORMAT);
+	await wb.toFileAsync(savePath);
 }
 /** 生成商品导入模板并保存到指定路径 */
 async function generateCatalogTemplate(savePath, isInitial) {
-	const workbook = new exceljs.default.Workbook();
-	const sheet = workbook.addWorksheet("商品信息");
-	const columns = [
-		{
-			header: "项目名称",
-			key: "name",
-			width: 30
-		},
-		{
-			header: "规格型号",
-			key: "model",
-			width: 20
-		},
-		{
-			header: "单位",
-			key: "unit",
-			width: 10
-		},
-		{
-			header: "税收分类编码",
-			key: "taxCode",
-			width: 20
-		},
-		{
-			header: "含税单价",
-			key: "price",
-			width: 15
-		}
+	const { wb, sheet } = await withSheet("商品信息");
+	const headers = [
+		"项目名称",
+		"规格型号",
+		"单位",
+		"税收分类编码",
+		"含税单价"
 	];
-	if (isInitial) columns.push({
-		header: "初始库存",
-		key: "stock",
-		width: 12
-	});
-	columns.push({
-		header: "备注",
-		key: "remark",
-		width: 30
-	});
-	sheet.columns = columns;
-	sheet.getRow(1).font = { bold: true };
-	sheet.getColumn(2).numFmt = "@";
-	sheet.getColumn(4).numFmt = "@";
-	await workbook.xlsx.writeFile(savePath);
+	const widths = [
+		30,
+		20,
+		10,
+		20,
+		15
+	];
+	if (isInitial) {
+		headers.push("初始库存");
+		widths.push(12);
+	}
+	headers.push("备注");
+	widths.push(30);
+	writeHeaders(sheet, headers, widths);
+	sheet.column(2).style("numberFormat", TEXT_FORMAT);
+	sheet.column(4).style("numberFormat", TEXT_FORMAT);
+	await wb.toFileAsync(savePath);
 }
 /** 生成月初总部进项导入模板并保存到指定路径 */
 async function generateInboundTemplate(savePath) {
-	const workbook = new exceljs.default.Workbook();
-	const sheet = workbook.addWorksheet("进项明细");
-	sheet.columns = [
-		{
-			header: "开票日期",
-			key: "invoiceDate",
-			width: 14
-		},
-		{
-			header: "发票号码",
-			key: "invoiceNo",
-			width: 22
-		},
-		{
-			header: "销售方名称",
-			key: "sellerName",
-			width: 30
-		},
-		{
-			header: "品名",
-			key: "name",
-			width: 30
-		},
-		{
-			header: "规格型号",
-			key: "model",
-			width: 20
-		},
-		{
-			header: "单位",
-			key: "unit",
-			width: 10
-		},
-		{
-			header: "数量",
-			key: "quantity",
-			width: 12
-		},
-		{
-			header: "含税单价",
-			key: "unitPrice",
-			width: 16
-		},
-		{
-			header: "不含税金额",
-			key: "amount",
-			width: 16
-		},
-		{
-			header: "税额",
-			key: "tax",
-			width: 14
-		},
-		{
-			header: "价税合计",
-			key: "total",
-			width: 16
-		}
-	];
-	sheet.getRow(1).font = { bold: true };
-	sheet.getRow(1).alignment = {
-		vertical: "middle",
-		horizontal: "center"
-	};
-	sheet.getColumn(1).numFmt = "yyyy-mm-dd";
-	sheet.getColumn(2).numFmt = "@";
-	sheet.getColumn(5).numFmt = "@";
-	sheet.getColumn(7).numFmt = "0";
-	for (let column = 8; column <= 11; column += 1) sheet.getColumn(column).numFmt = "0.00";
-	sheet.views = [{
-		state: "frozen",
-		ySplit: 1
-	}];
-	sheet.autoFilter = {
-		from: "A1",
-		to: "K1"
-	};
-	await workbook.xlsx.writeFile(savePath);
+	const { wb, sheet } = await withSheet("进项明细");
+	writeHeaders(sheet, [
+		"开票日期",
+		"发票号码",
+		"销售方名称",
+		"品名",
+		"规格型号",
+		"单位",
+		"数量",
+		"含税单价",
+		"不含税金额",
+		"税额",
+		"价税合计"
+	], [
+		14,
+		22,
+		30,
+		30,
+		20,
+		10,
+		12,
+		16,
+		16,
+		14,
+		16
+	], true);
+	sheet.column(1).style("numberFormat", "yyyy-mm-dd");
+	sheet.column(2).style("numberFormat", TEXT_FORMAT);
+	sheet.column(5).style("numberFormat", TEXT_FORMAT);
+	sheet.column(7).style("numberFormat", "0");
+	for (let col = 8; col <= 11; col += 1) sheet.column(col).style("numberFormat", "0.00");
+	sheet.freezePanes("A2");
+	sheet.autoFilter = "A1:K1";
+	await wb.toFileAsync(savePath);
 }
 //#endregion
 //#region src/main/ipc/customers-ipc.ts
@@ -3669,65 +3646,44 @@ function previewReplenishment() {
 //#endregion
 //#region src/main/domains/inventory/replenishment-excel.ts
 /**
-* 月底负库存导出 Excel 生成。
+* 月底负库存导出 Excel 生成（基于 xlsx-populate）。
 */
 /** 生成月底负库存导出 Excel Buffer */
 async function generateReplenishmentExcel(lines) {
-	const workbook = new exceljs.default.Workbook();
-	const sheet = workbook.addWorksheet("月底负库存导出");
-	sheet.columns = [
-		{
-			header: "项目名称",
-			key: "name",
-			width: 30
-		},
-		{
-			header: "型号",
-			key: "model",
-			width: 20
-		},
-		{
-			header: "单位",
-			key: "unit",
-			width: 10
-		},
-		{
-			header: "待补数量",
-			key: "quantity",
-			width: 12
-		},
-		{
-			header: "含税单价",
-			key: "unitPrice",
-			width: 15
-		},
-		{
-			header: "不含税金额",
-			key: "amount",
-			width: 15
-		},
-		{
-			header: "税率",
-			key: "taxRate",
-			width: 8
-		},
-		{
-			header: "税额",
-			key: "tax",
-			width: 15
-		},
-		{
-			header: "价税合计",
-			key: "total",
-			width: 15
-		}
+	const wb = await xlsx_populate.default.fromBlankAsync();
+	const sheet = wb.addSheet("月底负库存导出");
+	wb.deleteSheet("Sheet1");
+	const headers = [
+		"项目名称",
+		"型号",
+		"单位",
+		"待补数量",
+		"含税单价",
+		"不含税金额",
+		"税率",
+		"税额",
+		"价税合计"
 	];
-	sheet.getRow(1).font = { bold: true };
-	sheet.getRow(1).fill = {
-		type: "pattern",
-		pattern: "solid",
-		fgColor: { argb: "FFE0E0E0" }
-	};
+	const widths = [
+		30,
+		20,
+		10,
+		12,
+		15,
+		15,
+		8,
+		15,
+		15
+	];
+	headers.forEach((h, i) => {
+		const col = i + 1;
+		sheet.column(col).width(widths[i]);
+		const cell = sheet.cell(1, col);
+		cell.value(h);
+		cell.style("bold", true);
+		cell.style("fill", "E0E0E0");
+	});
+	let row = 2;
 	const totals = {
 		qty: 0,
 		amount: 0,
@@ -3735,36 +3691,29 @@ async function generateReplenishmentExcel(lines) {
 		total: 0
 	};
 	for (const line of lines) {
-		addReplenishmentRow(sheet, line);
+		sheet.cell(row, 1).value(escapeFormulaInjection(line.name));
+		sheet.cell(row, 2).value(escapeFormulaInjection(line.model));
+		sheet.cell(row, 3).value(escapeFormulaInjection(line.unit));
+		sheet.cell(row, 4).value(line.replenishmentQuantity);
+		sheet.cell(row, 5).value(line.unitPriceDecimal);
+		sheet.cell(row, 6).value(centToYuan(line.amountCent));
+		sheet.cell(row, 7).value(TAX_RATE_DECIMAL);
+		sheet.cell(row, 8).value(centToYuan(line.taxCent));
+		sheet.cell(row, 9).value(centToYuan(line.totalCent));
 		totals.qty += line.replenishmentQuantity;
 		totals.amount += line.amountCent;
 		totals.tax += line.taxCent;
 		totals.total += line.totalCent;
+		row += 1;
 	}
-	sheet.addRow({
-		name: "总计",
-		quantity: totals.qty,
-		amount: centToYuan(totals.amount),
-		tax: centToYuan(totals.tax),
-		total: centToYuan(totals.total)
-	});
-	sheet.getRow(sheet.rowCount).font = { bold: true };
-	const buffer = await workbook.xlsx.writeBuffer();
-	return Buffer.from(buffer);
-}
-/** 添加一行明细数据 */
-function addReplenishmentRow(sheet, line) {
-	sheet.addRow({
-		name: escapeFormulaInjection(line.name),
-		model: escapeFormulaInjection(line.model),
-		unit: escapeFormulaInjection(line.unit),
-		quantity: line.replenishmentQuantity,
-		unitPrice: line.unitPriceDecimal,
-		amount: centToYuan(line.amountCent),
-		taxRate: TAX_RATE_DECIMAL,
-		tax: centToYuan(line.taxCent),
-		total: centToYuan(line.totalCent)
-	});
+	const totalRow = row;
+	sheet.cell(totalRow, 1).value("总计");
+	sheet.cell(totalRow, 4).value(totals.qty);
+	sheet.cell(totalRow, 6).value(centToYuan(totals.amount));
+	sheet.cell(totalRow, 8).value(centToYuan(totals.tax));
+	sheet.cell(totalRow, 9).value(centToYuan(totals.total));
+	for (let col = 1; col <= 9; col += 1) sheet.cell(totalRow, col).style("bold", true);
+	return wb.outputAsync();
 }
 //#endregion
 //#region src/main/domains/inventory/replenishment-export.ts

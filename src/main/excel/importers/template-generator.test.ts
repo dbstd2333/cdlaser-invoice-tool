@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import ExcelJS from 'exceljs';
+import XlsxPopulate from 'xlsx-populate';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -22,13 +22,14 @@ describe('进项导入模板生成器', () => {
     const filePath = join(tempDirectory, '月初总部进项导入模板.xlsx');
     await generateInboundTemplate(filePath);
 
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(filePath);
-    const sheet = workbook.getWorksheet('进项明细');
-    const headers = sheet?.getRow(1).values;
+    const workbook = await XlsxPopulate.fromFileAsync(filePath);
+    const sheet = workbook.sheet('进项明细');
+    const headers: unknown[] = [];
+    for (let col = 1; col <= 11; col += 1) {
+      headers.push(sheet.cell(1, col).value());
+    }
 
     expect(headers).toEqual([
-      undefined,
       '开票日期',
       '发票号码',
       '销售方名称',
@@ -61,12 +62,11 @@ describe('客户导入模板生成器', () => {
     const filePath = join(tempDirectory, '客户导入模板.xlsx');
     await generateCustomerTemplate(filePath);
 
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(filePath);
-    const sheet = workbook.getWorksheet('客户信息');
+    const workbook = await XlsxPopulate.fromFileAsync(filePath);
+    const sheet = workbook.sheet('客户信息');
 
-    expect(sheet?.getColumn(2).numFmt).toBe('@');
-    expect(sheet?.getColumn(5).numFmt).toBe('@');
-    expect(sheet?.getColumn(7).numFmt).toBe('@');
+    expect(sheet.column(2).style('numberFormat')).toBe('@');
+    expect(sheet.column(5).style('numberFormat')).toBe('@');
+    expect(sheet.column(7).style('numberFormat')).toBe('@');
   });
 });

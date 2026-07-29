@@ -1,5 +1,5 @@
 import type { InboundRawRow } from '../../domains/inbound/inbound-types';
-import { readWorkbook, cellToText, findColumnIndex } from './parser-utils';
+import { readWorkbook, cellToText, findColumnIndex, type ReadRow, type ReadSheet } from './parser-utils';
 import { trimInvisible } from '@shared/contracts/normalize';
 import log from 'electron-log/main';
 
@@ -28,7 +28,7 @@ export async function parseInboundExcel(filePath: string): Promise<{ rows: Inbou
 }
 
 /** 构建进项票列映射 */
-function buildInboundColMap(headerRow: import('exceljs').Row): Record<string, number> {
+function buildInboundColMap(headerRow: ReadRow): Record<string, number> {
   return {
     invoiceDate: findColumnIndex(headerRow, ['开票日期', '发票日期', '日期']),
     invoiceNo: findColumnIndex(headerRow, ['发票号', '发票号码', '发票编号']),
@@ -45,7 +45,7 @@ function buildInboundColMap(headerRow: import('exceljs').Row): Record<string, nu
 }
 
 /** 解析单个工作表 */
-function parseInboundSheet(sheet: import('exceljs').Worksheet, sheetName: string, colMap: Record<string, number>, allRows: InboundRawRow[]): void {
+function parseInboundSheet(sheet: ReadSheet, sheetName: string, colMap: Record<string, number>, allRows: InboundRawRow[]): void {
   for (let r = 2; r <= sheet.rowCount; r++) {
     const row = sheet.getRow(r);
     const name = trimInvisible(cellToText(row.getCell(colMap.name)));

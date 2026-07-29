@@ -10,6 +10,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "build:win": "electron-vite build && electron-builder --win --x64",
+    "build:mac": "electron-vite build && electron-builder --mac --x64",
     "lint": "oxlint src --vue-plugin",
     "typecheck": "vue-tsc --noEmit && tsc -p tsconfig.main.json --noEmit",
     "test": "vitest run",
@@ -26,13 +27,12 @@
     "drizzle-orm": "0.45.2",
     "electron-log": "5.4.4",
     "element-plus": "2.14.3",
-    "exceljs": "4.4.0",
     "jszip": "3.10.1",
     "pinia": "4.0.2",
-    "readable-stream": "^2.3.8",
     "uuid": "14.0.1",
     "vue": "3.5.40",
     "vue-router": "5.2.0",
+    "xlsx-populate": "^1.21.0",
     "zod": "4.4.3"
   },
   "devDependencies": {

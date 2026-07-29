@@ -1980,28 +1980,23 @@ PI = new Decimal(PI);
 /**
 * 金额计算工具模块。
 * 所有业务金额计算统一使用 decimal.js，禁止使用 JS Number 浮点直接计算。
-* 金额、税额、价税合计均以「人民币分」整数存储；单价以规范化十进制字符串存储。
+* 金额、税额、价税合计均以「人民币分」整数存储；单价以「含税单价」规范化十进制字符串存储，
+* 计算不含税金额时由 taxExclusiveUnitPrice 反推（含税单价 ÷ 1.13）。
 */
 Decimal.set({
 	rounding: Decimal.ROUND_HALF_UP,
 	precision: 40
 });
 var TAX_RATE_FACTOR = new Decimal("0.13");
+new Decimal(1).plus(TAX_RATE_FACTOR);
+/** 销项开票默认金额系数（金额 = 含税单价 × 系数） */
+var OUTBOUND_AMOUNT_FACTOR = "1.09";
 /**
-* 计算金额（分）= 数量 × 不含税单价，四舍五入到 2 位。
+* 销项开票金额（分）= 含税单价 × 数量 × 系数，四舍五入到 2 位。
+* 直接按含税单价乘固定系数，不另算税额/价税合计/不含税金额。
 */
-function calcAmountCent(quantity, unitPriceDecimal) {
-	return new Decimal(quantity).times(new Decimal(unitPriceDecimal)).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).times(100).round().toNumber();
-}
-/**
-* 计算税额（分）= 金额（分）× 13%，四舍五入到 2 位。
-*/
-function calcTaxCent(amountCent) {
-	return new Decimal(amountCent).times(TAX_RATE_FACTOR).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber();
-}
-/** 价税合计（分）= 金额 + 税额 */
-function calcTotalCent(amountCent, taxCent) {
-	return amountCent + taxCent;
+function calcOutboundAmountCent(quantity, taxInclusiveUnitPrice, factor = OUTBOUND_AMOUNT_FACTOR) {
+	return new Decimal(quantity).times(new Decimal(taxInclusiveUnitPrice)).times(new Decimal(factor)).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).times(100).round().toNumber();
 }
 /** 将分转换为元字符串，保留 2 位小数 */
 function centToYuan(cent) {
@@ -2016,4 +2011,4 @@ function centToDisplay(cent) {
 	return decPart ? `${formattedInt}.${decPart}` : `${formattedInt}.00`;
 }
 //#endregion
-export { centToDisplay as i, calcTaxCent as n, calcTotalCent as r, calcAmountCent as t };
+export { centToDisplay as n, calcOutboundAmountCent as t };

@@ -1,64 +1,59 @@
-import ExcelJS from 'exceljs';
+import XlsxPopulate from 'xlsx-populate';
 import { centToYuan, TAX_RATE_DECIMAL } from '@shared/money/index';
 import { escapeFormulaInjection } from '@shared/contracts/normalize';
 import type { ReplenishmentPreviewLine } from './replenishment-types';
 
 /**
- * 月底负库存导出 Excel 生成。
+ * 月底负库存导出 Excel 生成（基于 xlsx-populate）。
  */
 
 /** 生成月底负库存导出 Excel Buffer */
 export async function generateReplenishmentExcel(lines: ReplenishmentPreviewLine[]): Promise<Buffer> {
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('月底负库存导出');
+  const wb = await XlsxPopulate.fromBlankAsync();
+  const sheet = wb.addSheet('月底负库存导出');
+  wb.deleteSheet('Sheet1');
 
-  sheet.columns = [
-    { header: '项目名称', key: 'name', width: 30 },
-    { header: '型号', key: 'model', width: 20 },
-    { header: '单位', key: 'unit', width: 10 },
-    { header: '待补数量', key: 'quantity', width: 12 },
-    { header: '含税单价', key: 'unitPrice', width: 15 },
-    { header: '不含税金额', key: 'amount', width: 15 },
-    { header: '税率', key: 'taxRate', width: 8 },
-    { header: '税额', key: 'tax', width: 15 },
-    { header: '价税合计', key: 'total', width: 15 },
-  ];
+  const headers = ['项目名称', '型号', '单位', '待补数量', '含税单价', '不含税金额', '税率', '税额', '价税合计'];
+  const widths = [30, 20, 10, 12, 15, 15, 8, 15, 15];
 
-  // 表头样式
-  sheet.getRow(1).font = { bold: true };
-  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+  headers.forEach((h, i) => {
+    const col = i + 1;
+    sheet.column(col).width(widths[i]);
+    const cell = sheet.cell(1, col);
+    cell.value(h);
+    cell.style('bold', true);
+    cell.style('fill', 'E0E0E0');
+  });
 
+  let row = 2;
   const totals = { qty: 0, amount: 0, tax: 0, total: 0 };
   for (const line of lines) {
-    addReplenishmentRow(sheet, line);
+    sheet.cell(row, 1).value(escapeFormulaInjection(line.name));
+    sheet.cell(row, 2).value(escapeFormulaInjection(line.model));
+    sheet.cell(row, 3).value(escapeFormulaInjection(line.unit));
+    sheet.cell(row, 4).value(line.replenishmentQuantity);
+    sheet.cell(row, 5).value(line.unitPriceDecimal);
+    sheet.cell(row, 6).value(centToYuan(line.amountCent));
+    sheet.cell(row, 7).value(TAX_RATE_DECIMAL);
+    sheet.cell(row, 8).value(centToYuan(line.taxCent));
+    sheet.cell(row, 9).value(centToYuan(line.totalCent));
     totals.qty += line.replenishmentQuantity;
     totals.amount += line.amountCent;
     totals.tax += line.taxCent;
     totals.total += line.totalCent;
+    row += 1;
   }
 
   // 页尾总计
-  sheet.addRow({
-    name: '总计', quantity: totals.qty,
-    amount: centToYuan(totals.amount), tax: centToYuan(totals.tax), total: centToYuan(totals.total),
-  });
-  sheet.getRow(sheet.rowCount).font = { bold: true };
+  const totalRow = row;
+  sheet.cell(totalRow, 1).value('总计');
+  sheet.cell(totalRow, 4).value(totals.qty);
+  sheet.cell(totalRow, 6).value(centToYuan(totals.amount));
+  sheet.cell(totalRow, 8).value(centToYuan(totals.tax));
+  sheet.cell(totalRow, 9).value(centToYuan(totals.total));
+  for (let col = 1; col <= 9; col += 1) {
+    sheet.cell(totalRow, col).style('bold', true);
+  }
 
-  const buffer = await workbook.xlsx.writeBuffer();
-  return Buffer.from(buffer);
-}
-
-/** 添加一行明细数据 */
-function addReplenishmentRow(sheet: ExcelJS.Worksheet, line: ReplenishmentPreviewLine): void {
-  sheet.addRow({
-    name: escapeFormulaInjection(line.name),
-    model: escapeFormulaInjection(line.model),
-    unit: escapeFormulaInjection(line.unit),
-    quantity: line.replenishmentQuantity,
-    unitPrice: line.unitPriceDecimal,
-    amount: centToYuan(line.amountCent),
-    taxRate: TAX_RATE_DECIMAL,
-    tax: centToYuan(line.taxCent),
-    total: centToYuan(line.totalCent),
-  });
+  return wb.outputAsync();
 }
