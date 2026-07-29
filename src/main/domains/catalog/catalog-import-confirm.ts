@@ -26,7 +26,7 @@ export function confirmInitialImport(token: string): { products: number; priceVe
 
   const db = getDb();
   const raw = getRawDb();
-  const validRows = preview.rows.filter((r) => r.errors.length === 0);
+  const validRows = preview.rows.filter((r) => r.errors.length === 0 && !r.deduped);
   const batchId = uuidv7();
   let productCount = 0;
   let pvCount = 0;
@@ -76,7 +76,7 @@ export function confirmDailyImport(token: string): { products: number; priceVers
 
   const db = getDb();
   const raw = getRawDb();
-  const validRows = preview.rows.filter((r) => r.errors.length === 0);
+  const validRows = preview.rows.filter((r) => r.errors.length === 0 && !r.deduped);
   let productCount = 0;
   let pvCount = 0;
 

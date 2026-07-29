@@ -26,8 +26,9 @@ describe('金额计算', () => {
       expect(normalizeUnitPrice('0.1234567890123')).toBe('0.1234567890123');
     });
 
-    it('应拒绝超过 13 位小数', () => {
-      expect(() => normalizeUnitPrice('0.12345678901234')).toThrow('小数位数');
+    it('超过 13 位小数应自动四舍五入到 13 位', () => {
+      expect(normalizeUnitPrice('0.12345678901234')).toBe('0.1234567890123'); // 第 14 位 4 舍去
+      expect(normalizeUnitPrice('0.12345678901235')).toBe('0.1234567890124'); // 第 14 位 5 进 1
     });
 
     it('应拒绝小于等于 0 的单价', () => {

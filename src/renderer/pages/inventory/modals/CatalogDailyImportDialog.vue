@@ -23,6 +23,7 @@
         <div class="preview-summary">
           <ElTag type="success">新增商品 {{ preview?.newProductCount }} 个</ElTag>
           <ElTag type="success">新增价格版本 {{ preview?.newPriceVersionCount }} 个</ElTag>
+          <ElTag v-if="preview && preview.dedupedRowCount > 0" type="warning">去重 {{ preview.dedupedRowCount }} 条</ElTag>
           <ElTag v-if="preview && preview.errorCount > 0" type="danger">错误 {{ preview.errorCount }} 条</ElTag>
         </div>
         <ElAlert v-if="preview?.hasErrors" type="error" :closable="false" show-icon>
@@ -37,8 +38,8 @@
           <ElTableColumn prop="unitPriceDecimal" label="单价" width="110" />
           <ElTableColumn label="状态" width="80">
             <template #default="{ row }">
-              <ElTag :type="row.errors.length > 0 ? 'danger' : 'success'" size="small">
-                {{ row.errors.length > 0 ? '错误' : '正常' }}
+              <ElTag :type="row.deduped ? 'warning' : row.errors.length > 0 ? 'danger' : 'success'" size="small">
+                {{ row.deduped ? '已去重' : row.errors.length > 0 ? '错误' : '正常' }}
               </ElTag>
             </template>
           </ElTableColumn>

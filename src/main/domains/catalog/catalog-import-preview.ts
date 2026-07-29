@@ -61,26 +61,27 @@ function normalizeUnitPriceSafe(input: string): string {
 }
 
 /** 构建首次导入预览 */
-export function buildInitialImportPreview(rawRows: Omit<CatalogImportRow, 'errors'>[]): CatalogImportPreviewResult {
+export function buildInitialImportPreview(rawRows: Omit<CatalogImportRow, 'errors' | 'deduped'>[]): CatalogImportPreviewResult {
   return buildPreview(rawRows, true);
 }
 
 /** 构建日常导入预览 */
-export function buildDailyImportPreview(rawRows: Omit<CatalogImportRow, 'errors'>[]): CatalogImportPreviewResult {
+export function buildDailyImportPreview(rawRows: Omit<CatalogImportRow, 'errors' | 'deduped'>[]): CatalogImportPreviewResult {
   return buildPreview(rawRows, false);
 }
 
 /** 构建预览的通用逻辑 */
-function buildPreview(rawRows: Omit<CatalogImportRow, 'errors'>[], isInitial: boolean): CatalogImportPreviewResult {
+function buildPreview(rawRows: Omit<CatalogImportRow, 'errors' | 'deduped'>[], isInitial: boolean): CatalogImportPreviewResult {
   const rows: CatalogImportRow[] = [];
   const errors: Array<{ rowIndex: number; field: string; reason: string }> = [];
   const seenPriceKeys = new Map<string, number>();
   let newProductCount = 0;
   let newPriceVersionCount = 0;
   let totalStockSum = 0;
+  let dedupedRowCount = 0;
 
   for (const raw of rawRows) {
-    const row: CatalogImportRow = { ...raw, initialStock: isInitial ? raw.initialStock : null, errors: [] };
+    const row: CatalogImportRow = { ...raw, initialStock: isInitial ? raw.initialStock : null, errors: [], deduped: false };
     const rowErrors = validateRow(row, isInitial);
     row.errors = rowErrors;
     rowErrors.forEach((e) => errors.push({ rowIndex: raw.rowIndex, field: '', reason: e }));
@@ -90,17 +91,17 @@ function buildPreview(rawRows: Omit<CatalogImportRow, 'errors'>[], isInitial: bo
     const unitPriceNormalized = row.unitPriceDecimal ? normalizeUnitPriceSafe(row.unitPriceDecimal) : '';
     const priceKey = `${nameNorm}|${modelNorm}|${unitPriceNormalized}`;
 
-    // 文件内重复检测
-    if (seenPriceKeys.has(priceKey)) {
-      const errMsg = `相同商品相同单价与第 ${seenPriceKeys.get(priceKey)} 行重复`;
-      row.errors.push(errMsg);
-      errors.push({ rowIndex: raw.rowIndex, field: 'unitPriceDecimal', reason: errMsg });
+    // 文件内重复检测：相同商品+型号+单价自动去重，仅保留首行（不报错、不阻断导入）
+    if (rowErrors.length === 0 && seenPriceKeys.has(priceKey)) {
+      row.deduped = true;
+      row.errors = [`与第 ${seenPriceKeys.get(priceKey)} 行重复，已自动去重`];
+      dedupedRowCount++;
     } else if (rowErrors.length === 0) {
       seenPriceKeys.set(priceKey, raw.rowIndex);
     }
 
-    // 数据库重复和冲突检测
-    if (rowErrors.length === 0) {
+    // 数据库重复和冲突检测（已去重行跳过）
+    if (rowErrors.length === 0 && !row.deduped) {
       const dbCheck = checkDatabaseConflict(row, nameNorm, modelNorm, unitPriceNormalized, isInitial);
       dbCheck.errors.forEach((e) => {
         row.errors.push(e);
@@ -114,11 +115,12 @@ function buildPreview(rawRows: Omit<CatalogImportRow, 'errors'>[], isInitial: bo
     rows.push(row);
   }
 
-  const errorCount = rows.filter((r) => r.errors.length > 0).length;
+  // 去重行不算错误，不计入 errorCount / hasErrors
+  const errorCount = rows.filter((r) => r.errors.length > 0 && !r.deduped).length;
   return {
     rows, newProductCount, newPriceVersionCount,
     totalStockSum: isInitial ? totalStockSum : 0,
-    errorCount, hasErrors: errorCount > 0, errors, isInitial,
+    errorCount, dedupedRowCount, hasErrors: errorCount > 0, errors, isInitial,
   };
 }
 

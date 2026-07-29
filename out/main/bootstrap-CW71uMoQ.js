@@ -2466,17 +2466,16 @@ decimal_js.default.set({
 var TAX_RATE_DECIMAL = "0.13";
 var TAX_RATE_FACTOR = new decimal_js.default("0.13");
 /**
-* 规范化单价字符串：去除首尾空白，去除科学计数法，校验小数位数不超过 13 位。
+* 规范化单价字符串：去除首尾空白，去除科学计数法，校验为正数。
+* 小数位数超过 UNIT_PRICE_MAX_DECIMALS（13）位时自动四舍五入到 13 位（而非报错），
+* 避免导入文件因单价精度被整批阻断；单价以十进制字符串存储，无浮点损失。
 * 返回不含前导零的最简十进制字符串（保留有效小数）。
 */
 function normalizeUnitPrice(input) {
 	const d = new decimal_js.default(String(input).trim());
 	if (!d.isFinite()) throw new Error("单价不是有效数字");
 	if (d.lte(0)) throw new Error("单价必须大于 0");
-	const str = d.toString();
-	const dotIndex = str.indexOf(".");
-	if (dotIndex >= 0 && str.length - dotIndex - 1 > 13) throw new Error(`单价小数位数不能超过 13 位`);
-	return str;
+	return d.toDecimalPlaces(13, decimal_js.default.ROUND_HALF_UP).toString();
 }
 /**
 * 计算金额（分）= 数量 × 不含税单价，四舍五入到 2 位。
@@ -2729,11 +2728,13 @@ function buildPreview(rawRows, isInitial) {
 	let newProductCount = 0;
 	let newPriceVersionCount = 0;
 	let totalStockSum = 0;
+	let dedupedRowCount = 0;
 	for (const raw of rawRows) {
 		const row = {
 			...raw,
 			initialStock: isInitial ? raw.initialStock : null,
-			errors: []
+			errors: [],
+			deduped: false
 		};
 		const rowErrors = validateRow(row, isInitial);
 		row.errors = rowErrors;
@@ -2746,16 +2747,12 @@ function buildPreview(rawRows, isInitial) {
 		const modelNorm = normalizeKey(row.model);
 		const unitPriceNormalized = row.unitPriceDecimal ? normalizeUnitPriceSafe$1(row.unitPriceDecimal) : "";
 		const priceKey = `${nameNorm}|${modelNorm}|${unitPriceNormalized}`;
-		if (seenPriceKeys.has(priceKey)) {
-			const errMsg = `相同商品相同单价与第 ${seenPriceKeys.get(priceKey)} 行重复`;
-			row.errors.push(errMsg);
-			errors.push({
-				rowIndex: raw.rowIndex,
-				field: "unitPriceDecimal",
-				reason: errMsg
-			});
+		if (rowErrors.length === 0 && seenPriceKeys.has(priceKey)) {
+			row.deduped = true;
+			row.errors = [`与第 ${seenPriceKeys.get(priceKey)} 行重复，已自动去重`];
+			dedupedRowCount++;
 		} else if (rowErrors.length === 0) seenPriceKeys.set(priceKey, raw.rowIndex);
-		if (rowErrors.length === 0) {
+		if (rowErrors.length === 0 && !row.deduped) {
 			const dbCheck = checkDatabaseConflict(row, nameNorm, modelNorm, unitPriceNormalized, isInitial);
 			dbCheck.errors.forEach((e) => {
 				row.errors.push(e);
@@ -2771,13 +2768,14 @@ function buildPreview(rawRows, isInitial) {
 		}
 		rows.push(row);
 	}
-	const errorCount = rows.filter((r) => r.errors.length > 0).length;
+	const errorCount = rows.filter((r) => r.errors.length > 0 && !r.deduped).length;
 	return {
 		rows,
 		newProductCount,
 		newPriceVersionCount,
 		totalStockSum: isInitial ? totalStockSum : 0,
 		errorCount,
+		dedupedRowCount,
 		hasErrors: errorCount > 0,
 		errors,
 		isInitial
@@ -2818,7 +2816,7 @@ function confirmInitialImport(token) {
 	if (preview.hasErrors) throw new Error("存在错误行，无法导入");
 	const db = getDb();
 	const raw = getRawDb();
-	const validRows = preview.rows.filter((r) => r.errors.length === 0);
+	const validRows = preview.rows.filter((r) => r.errors.length === 0 && !r.deduped);
 	const batchId = (0, uuid.v7)();
 	let productCount = 0;
 	let pvCount = 0;
@@ -2868,7 +2866,7 @@ function confirmDailyImport(token) {
 	if (preview.hasErrors) throw new Error("存在错误行，无法导入");
 	const db = getDb();
 	const raw = getRawDb();
-	const validRows = preview.rows.filter((r) => r.errors.length === 0);
+	const validRows = preview.rows.filter((r) => r.errors.length === 0 && !r.deduped);
 	let productCount = 0;
 	let pvCount = 0;
 	raw.transaction(() => {

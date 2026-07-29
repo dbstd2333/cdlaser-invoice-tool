@@ -20,7 +20,9 @@ export const TAX_RATE_FACTOR = new Decimal('0.13');
 export const UNIT_PRICE_MAX_DECIMALS = 13;
 
 /**
- * 规范化单价字符串：去除首尾空白，去除科学计数法，校验小数位数不超过 13 位。
+ * 规范化单价字符串：去除首尾空白，去除科学计数法，校验为正数。
+ * 小数位数超过 UNIT_PRICE_MAX_DECIMALS（13）位时自动四舍五入到 13 位（而非报错），
+ * 避免导入文件因单价精度被整批阻断；单价以十进制字符串存储，无浮点损失。
  * 返回不含前导零的最简十进制字符串（保留有效小数）。
  */
 export function normalizeUnitPrice(input: string | number | Decimal): string {
@@ -31,12 +33,8 @@ export function normalizeUnitPrice(input: string | number | Decimal): string {
   if (d.lte(0)) {
     throw new Error('单价必须大于 0');
   }
-  const str = d.toString();
-  const dotIndex = str.indexOf('.');
-  if (dotIndex >= 0 && str.length - dotIndex - 1 > UNIT_PRICE_MAX_DECIMALS) {
-    throw new Error(`单价小数位数不能超过 ${UNIT_PRICE_MAX_DECIMALS} 位`);
-  }
-  return str;
+  const rounded = d.toDecimalPlaces(UNIT_PRICE_MAX_DECIMALS, Decimal.ROUND_HALF_UP);
+  return rounded.toString();
 }
 
 /**

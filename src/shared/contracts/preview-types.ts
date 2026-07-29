@@ -53,6 +53,8 @@ export interface CatalogImportRow {
   initialStock: number | null;
   remark: string | null;
   errors: string[];
+  /** 文件内相同商品+型号+单价，自动去重（仅保留首行，确认时不写入） */
+  deduped: boolean;
 }
 
 export interface CatalogImportPreviewResult {
@@ -61,6 +63,8 @@ export interface CatalogImportPreviewResult {
   newPriceVersionCount: number;
   totalStockSum: number;
   errorCount: number;
+  /** 文件内自动去重的行数（相同商品+型号+单价） */
+  dedupedRowCount: number;
   hasErrors: boolean;
   errors: Array<{ rowIndex: number; field: string; reason: string }>;
   isInitial: boolean;

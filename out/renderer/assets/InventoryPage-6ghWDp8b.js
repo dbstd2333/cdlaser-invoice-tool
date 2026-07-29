@@ -1896,8 +1896,15 @@ var CatalogInitialImportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper
 							default: withCtx(() => [createTextVNode("库存合计 " + toDisplayString(preview.value?.totalStockSum), 1)]),
 							_: 1
 						}),
-						preview.value && preview.value.errorCount > 0 ? (openBlock(), createBlock(_component_ElTag, {
+						preview.value && preview.value.dedupedRowCount > 0 ? (openBlock(), createBlock(_component_ElTag, {
 							key: 0,
+							type: "warning"
+						}, {
+							default: withCtx(() => [createTextVNode("去重 " + toDisplayString(preview.value.dedupedRowCount) + " 条", 1)]),
+							_: 1
+						})) : createCommentVNode("", true),
+						preview.value && preview.value.errorCount > 0 ? (openBlock(), createBlock(_component_ElTag, {
+							key: 1,
 							type: "danger"
 						}, {
 							default: withCtx(() => [createTextVNode("错误 " + toDisplayString(preview.value.errorCount) + " 条", 1)]),
@@ -1961,10 +1968,10 @@ var CatalogInitialImportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper
 								width: "80"
 							}, {
 								default: withCtx(({ row }) => [createVNode(_component_ElTag, {
-									type: row.errors.length > 0 ? "danger" : "success",
+									type: row.deduped ? "warning" : row.errors.length > 0 ? "danger" : "success",
 									size: "small"
 								}, {
-									default: withCtx(() => [createTextVNode(toDisplayString(row.errors.length > 0 ? "错误" : "正常"), 1)]),
+									default: withCtx(() => [createTextVNode(toDisplayString(row.deduped ? "已去重" : row.errors.length > 0 ? "错误" : "正常"), 1)]),
 									_: 2
 								}, 1032, ["type"])]),
 								_: 1
@@ -1984,7 +1991,7 @@ var CatalogInitialImportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper
 			}, 8, ["modelValue"]);
 		};
 	}
-}), [["__scopeId", "data-v-1eb6437e"]]);
+}), [["__scopeId", "data-v-8c2981d6"]]);
 //#endregion
 //#region src/renderer/pages/inventory/modals/CatalogDailyImportDialog.vue?vue&type=script&setup=true&lang.ts
 var _hoisted_1$3 = { class: "import-content" };
@@ -2129,8 +2136,15 @@ var CatalogDailyImportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_d
 							default: withCtx(() => [createTextVNode("新增价格版本 " + toDisplayString(preview.value?.newPriceVersionCount) + " 个", 1)]),
 							_: 1
 						}),
-						preview.value && preview.value.errorCount > 0 ? (openBlock(), createBlock(_component_ElTag, {
+						preview.value && preview.value.dedupedRowCount > 0 ? (openBlock(), createBlock(_component_ElTag, {
 							key: 0,
+							type: "warning"
+						}, {
+							default: withCtx(() => [createTextVNode("去重 " + toDisplayString(preview.value.dedupedRowCount) + " 条", 1)]),
+							_: 1
+						})) : createCommentVNode("", true),
+						preview.value && preview.value.errorCount > 0 ? (openBlock(), createBlock(_component_ElTag, {
+							key: 1,
 							type: "danger"
 						}, {
 							default: withCtx(() => [createTextVNode("错误 " + toDisplayString(preview.value.errorCount) + " 条", 1)]),
@@ -2189,10 +2203,10 @@ var CatalogDailyImportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_d
 								width: "80"
 							}, {
 								default: withCtx(({ row }) => [createVNode(_component_ElTag, {
-									type: row.errors.length > 0 ? "danger" : "success",
+									type: row.deduped ? "warning" : row.errors.length > 0 ? "danger" : "success",
 									size: "small"
 								}, {
-									default: withCtx(() => [createTextVNode(toDisplayString(row.errors.length > 0 ? "错误" : "正常"), 1)]),
+									default: withCtx(() => [createTextVNode(toDisplayString(row.deduped ? "已去重" : row.errors.length > 0 ? "错误" : "正常"), 1)]),
 									_: 2
 								}, 1032, ["type"])]),
 								_: 1
@@ -2212,7 +2226,7 @@ var CatalogDailyImportDialog_default = /*#__PURE__*/ _plugin_vue_export_helper_d
 			}, 8, ["modelValue"]);
 		};
 	}
-}), [["__scopeId", "data-v-894c9b9e"]]);
+}), [["__scopeId", "data-v-4543ed31"]]);
 //#endregion
 //#region src/renderer/pages/inventory/modals/ReplenishmentExportDialog.vue?vue&type=script&setup=true&lang.ts
 var _hoisted_1$2 = { class: "export-content" };
