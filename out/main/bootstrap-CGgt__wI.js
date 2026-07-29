@@ -3291,6 +3291,7 @@ async function executeOutboundExport(input) {
 	return {
 		batchId,
 		batchNo,
+		customerName: customer.name,
 		xlsxBuffer,
 		exportedAt,
 		...totals
@@ -3483,11 +3484,16 @@ function getOutboundDetail(id) {
 }
 /** 获取原始 XLSX Buffer（用于重新下载） */
 function getOutboundXlsx(id) {
-	const row = getRawDb().prepare("SELECT xlsx_blob, batch_no FROM outbound_batches WHERE id = ?").get(id);
+	const row = getRawDb().prepare("SELECT xlsx_blob, batch_no, customer_snapshot FROM outbound_batches WHERE id = ?").get(id);
 	if (!row) return null;
+	let customerName = "";
+	try {
+		customerName = JSON.parse(row.customer_snapshot).name ?? "";
+	} catch {}
 	return {
 		buffer: Buffer.from(row.xlsx_blob, "base64"),
-		batchNo: row.batch_no
+		batchNo: row.batch_no,
+		customerName
 	};
 }
 //#endregion
@@ -3546,6 +3552,10 @@ function restoreOutboundLine(db, raw, batchId, batchNo, reason, line) {
 /**
 * 销项开票 IPC 处理器 - 导出、列表、详情、下载、作废。
 */
+/** 清理文件名中的非法字符 */
+function sanitizeFileName(name) {
+	return name.replace(/[\\/:*?"<>|]/g, "").trim() || "未命名";
+}
 function registerOutboundIpc() {
 	registerHandler(IPC_CHANNELS.outbound.validateDraft, outboundExportSchema, (input) => {
 		return validateDraft(input);
@@ -3554,7 +3564,7 @@ function registerOutboundIpc() {
 		const result = await executeOutboundExport(input);
 		const saveResult = await electron.dialog.showSaveDialog({
 			title: "保存税务模板",
-			defaultPath: `销项开票_${result.batchNo}.xlsx`,
+			defaultPath: `销项开票_${sanitizeFileName(result.customerName)}_${result.batchNo}.xlsx`,
 			filters: [{
 				name: "Excel",
 				extensions: ["xlsx"]
@@ -3602,7 +3612,7 @@ function registerOutboundIpc() {
 		if (!xlsxData) throw new Error("开票记录不存在");
 		const saveResult = await electron.dialog.showSaveDialog({
 			title: "重新下载开票文件",
-			defaultPath: `销项开票_${xlsxData.batchNo}.xlsx`,
+			defaultPath: `销项开票_${sanitizeFileName(xlsxData.customerName)}_${xlsxData.batchNo}.xlsx`,
 			filters: [{
 				name: "Excel",
 				extensions: ["xlsx"]

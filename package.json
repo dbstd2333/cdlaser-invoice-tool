@@ -29,6 +29,7 @@
     "exceljs": "4.4.0",
     "jszip": "3.10.1",
     "pinia": "4.0.2",
+    "readable-stream": "^2.3.8",
     "uuid": "14.0.1",
     "vue": "3.5.40",
     "vue-router": "5.2.0",
@@ -63,7 +64,12 @@
     "publish": null,
     "files": [
       "out/**/*",
-      "resources/**/*"
+      "resources/**/*",
+      "package.json",
+      "node_modules/**/*",
+      "!node_modules/.bin",
+      "!**/node_modules/*/{test,__tests__,tests}/**/*",
+      "!**/*.map"
     ],
     "win": {
       "target": [
