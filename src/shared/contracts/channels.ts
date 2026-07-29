@@ -33,6 +33,7 @@ export const IPC_CHANNELS = {
     updateProduct: 'catalog.updateProduct',
     createPriceVersion: 'catalog.createPriceVersion',
     deleteProduct: 'catalog.deleteProduct',
+    getPriceVersionsByProduct: 'catalog.getPriceVersionsByProduct',
     initialImportPreview: 'catalog.initialImportPreview',
     initialImportConfirm: 'catalog.initialImportConfirm',
     dailyImportPreview: 'catalog.dailyImportPreview',

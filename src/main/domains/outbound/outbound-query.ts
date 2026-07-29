@@ -96,9 +96,13 @@ export function getOutboundDetail(id: string): { batch: OutboundBatch; lines: Ou
 }
 
 /** 获取原始 XLSX Buffer（用于重新下载） */
-export function getOutboundXlsx(id: string): { buffer: Buffer; batchNo: string } | null {
+export function getOutboundXlsx(id: string): { buffer: Buffer; batchNo: string; customerName: string } | null {
   const raw = getRawDb();
-  const row = raw.prepare('SELECT xlsx_blob, batch_no FROM outbound_batches WHERE id = ?').get(id) as { xlsx_blob: string; batch_no: string } | undefined;
+  const row = raw.prepare('SELECT xlsx_blob, batch_no, customer_snapshot FROM outbound_batches WHERE id = ?').get(id) as { xlsx_blob: string; batch_no: string; customer_snapshot: string } | undefined;
   if (!row) return null;
-  return { buffer: Buffer.from(row.xlsx_blob, 'base64'), batchNo: row.batch_no };
+  let customerName = '';
+  try {
+    customerName = (JSON.parse(row.customer_snapshot) as { name?: string }).name ?? '';
+  } catch { /* ignore */ }
+  return { buffer: Buffer.from(row.xlsx_blob, 'base64'), batchNo: row.batch_no, customerName };
 }

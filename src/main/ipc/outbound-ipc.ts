@@ -21,6 +21,12 @@ import log from 'electron-log/main';
 /**
  * 销项开票 IPC 处理器 - 导出、列表、详情、下载、作废。
  */
+
+/** 清理文件名中的非法字符 */
+function sanitizeFileName(name: string): string {
+  return name.replace(/[\\/:*?"<>|]/g, '').trim() || '未命名';
+}
+
 export function registerOutboundIpc(): void {
   // 校验草稿（开票 Modal 打开前）
   registerHandler(IPC_CHANNELS.outbound.validateDraft, outboundExportSchema, (input) => {
@@ -35,7 +41,7 @@ export function registerOutboundIpc(): void {
     // 弹出保存对话框
     const saveResult = await dialog.showSaveDialog({
       title: '保存税务模板',
-      defaultPath: `销项开票_${result.batchNo}.xlsx`,
+      defaultPath: `销项开票_${sanitizeFileName(result.customerName)}_${result.batchNo}.xlsx`,
       filters: [{ name: 'Excel', extensions: ['xlsx'] }],
     });
 
@@ -86,7 +92,7 @@ export function registerOutboundIpc(): void {
     if (!xlsxData) throw new Error('开票记录不存在');
     const saveResult = await dialog.showSaveDialog({
       title: '重新下载开票文件',
-      defaultPath: `销项开票_${xlsxData.batchNo}.xlsx`,
+      defaultPath: `销项开票_${sanitizeFileName(xlsxData.customerName)}_${xlsxData.batchNo}.xlsx`,
       filters: [{ name: 'Excel', extensions: ['xlsx'] }],
     });
     if (saveResult.canceled || !saveResult.filePath) return { saved: false };

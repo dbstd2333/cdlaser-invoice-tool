@@ -74,7 +74,7 @@ export async function executeOutboundExport(input: OutboundExportInput): Promise
   });
 
   tx();
-  return { batchId, batchNo, xlsxBuffer, exportedAt, ...totals };
+  return { batchId, batchNo, customerName: customer.name, xlsxBuffer, exportedAt, ...totals };
 }
 
 /** 构造税务模板行 */

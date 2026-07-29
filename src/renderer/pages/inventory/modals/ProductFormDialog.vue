@@ -20,12 +20,6 @@
       <ElFormItem label="税收分类编码" prop="taxClassificationCode" required>
         <ElInput v-model="form.taxClassificationCode" maxlength="19" />
       </ElFormItem>
-      <ElFormItem label="状态">
-        <ElRadioGroup v-model="form.status">
-          <ElRadio value="active">启用</ElRadio>
-          <ElRadio value="inactive">停用</ElRadio>
-        </ElRadioGroup>
-      </ElFormItem>
       <ElFormItem label="备注">
         <ElInput v-model="form.remark" type="textarea" />
       </ElFormItem>

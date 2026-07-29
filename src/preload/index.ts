@@ -79,6 +79,7 @@ const api = {
     dailyImportConfirm: (token: string) => invoke<{ products: number; priceVersions: number }>(IPC_CHANNELS.catalog.dailyImportConfirm, token),
     fieldHistory: (params: unknown) => invoke<{ rows: FieldHistoryEntry[]; total: number }>(IPC_CHANNELS.catalog.fieldHistory, params),
     getPriceVersionsByIds: (ids: string[]) => invoke<PriceVersion[]>('catalog.getPriceVersionsByIds', ids),
+    getPriceVersionsByProduct: (productId: string) => invoke<PriceVersion[]>(IPC_CHANNELS.catalog.getPriceVersionsByProduct, productId),
     downloadTemplate: (isInitial: boolean) =>
       invoke<{ saved: boolean; path?: string }>(IPC_CHANNELS.catalog.downloadTemplate, { isInitial }),
   },

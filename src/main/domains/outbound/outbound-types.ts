@@ -22,6 +22,7 @@ export interface DraftValidationResult {
 export interface OutboundExportResult {
   batchId: string;
   batchNo: string;
+  customerName: string;
   xlsxBuffer: Buffer;
   exportedAt: string;
   totalQuantity: number;

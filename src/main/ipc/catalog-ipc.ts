@@ -15,6 +15,7 @@ import {
   deleteProduct,
   createPriceVersion,
   getPriceVersionsByIds,
+  getPriceVersionsByProduct,
 } from '../domains/catalog/catalog-service';
 import {
   buildInitialImportPreview,
@@ -115,6 +116,10 @@ export function registerCatalogIpc(): void {
   // 批量获取价格版本详情（开票 Modal 前校验）
   registerHandler('catalog.getPriceVersionsByIds', null, (ids: string[]) => {
     return getPriceVersionsByIds(ids);
+  });
+
+  registerHandler(IPC_CHANNELS.catalog.getPriceVersionsByProduct, null, (id: string) => {
+    return getPriceVersionsByProduct(id);
   });
 
   // 下载商品模板

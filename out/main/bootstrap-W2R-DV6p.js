@@ -721,9 +721,9 @@ var IPC_CHANNELS = {
 		getProductById: "catalog.getProductById",
 		createProduct: "catalog.createProduct",
 		updateProduct: "catalog.updateProduct",
-		toggleProductStatus: "catalog.toggleProductStatus",
 		createPriceVersion: "catalog.createPriceVersion",
-		togglePriceVersionStatus: "catalog.togglePriceVersionStatus",
+		deleteProduct: "catalog.deleteProduct",
+		getPriceVersionsByProduct: "catalog.getPriceVersionsByProduct",
 		initialImportPreview: "catalog.initialImportPreview",
 		initialImportConfirm: "catalog.initialImportConfirm",
 		dailyImportPreview: "catalog.dailyImportPreview",
@@ -843,6 +843,8 @@ var priceVersionCreateSchema = zod.z.object({
 /** 商品价格版本查询 */
 var priceVersionQuerySchema = zod.z.object({
 	keyword: zod.z.string().optional(),
+	name: zod.z.string().optional(),
+	model: zod.z.string().optional(),
 	stockStatus: zod.z.enum([
 		"positive",
 		"zero",
@@ -876,7 +878,8 @@ var outboundLineInputSchema = zod.z.object({
 /** 销项导出请求 */
 var outboundExportSchema = zod.z.object({
 	customerId: zod.z.string().min(1),
-	lines: zod.z.array(outboundLineInputSchema).min(1, "至少选择一行").max(2e3, "单次最多 2000 条明细")
+	lines: zod.z.array(outboundLineInputSchema).min(1, "至少选择一行").max(2e3, "单次最多 2000 条明细"),
+	amountFactor: zod.z.string().optional()
 });
 /** 开票记录查询 */
 var outboundQuerySchema = zod.z.object({
@@ -1933,7 +1936,7 @@ async function parseCatalogExcel(filePath, isInitial) {
 			"tax_code"
 		]),
 		price: findColumnIndex(headerRow, [
-			"不含税单价",
+			"含税单价",
 			"单价",
 			"unit_price"
 		]),
@@ -2019,7 +2022,7 @@ function buildInboundColMap(headerRow) {
 		]),
 		unit: findColumnIndex(headerRow, ["单位"]),
 		quantity: findColumnIndex(headerRow, ["数量"]),
-		price: findColumnIndex(headerRow, ["单价", "不含税单价"]),
+		price: findColumnIndex(headerRow, ["含税单价", "单价"]),
 		amount: findColumnIndex(headerRow, ["金额", "不含税金额"]),
 		tax: findColumnIndex(headerRow, ["税额", "税"]),
 		total: findColumnIndex(headerRow, ["合计", "价税合计"])
@@ -2146,7 +2149,7 @@ async function generateCatalogTemplate(savePath, isInitial) {
 			width: 20
 		},
 		{
-			header: "不含税单价",
+			header: "含税单价",
 			key: "price",
 			width: 15
 		}
@@ -2208,7 +2211,7 @@ async function generateInboundTemplate(savePath) {
 			width: 12
 		},
 		{
-			header: "不含税单价",
+			header: "含税单价",
 			key: "unitPrice",
 			width: 16
 		},
@@ -2403,6 +2406,14 @@ function buildQueryConditions$1(input) {
 		conditions.push("(p.name LIKE ? OR p.model LIKE ? OR p.tax_classification_code LIKE ?)");
 		params.push(kw, kw, kw);
 	}
+	if (input.name?.trim()) {
+		conditions.push("p.name LIKE ?");
+		params.push(`%${input.name.trim()}%`);
+	}
+	if (input.model?.trim()) {
+		conditions.push("p.model LIKE ?");
+		params.push(`%${input.model.trim()}%`);
+	}
 	if (input.stockStatus && input.stockStatus !== "all") conditions.push({
 		positive: "pv.stock_balance > 0",
 		zero: "pv.stock_balance = 0",
@@ -2438,6 +2449,10 @@ function getProductById(id) {
 	const row = toCamel(getRawDb().prepare("SELECT * FROM products WHERE id = ?").get(id));
 	return row ? mapProduct(row) : null;
 }
+/** 获取商品的所有价格版本 */
+function getPriceVersionsByProduct(productId) {
+	return toCamelList(getRawDb().prepare("SELECT * FROM price_versions WHERE product_id = ? ORDER BY created_at").all(productId)).map(mapPriceVersion);
+}
 /** 按 ID 获取价格版本 */
 function getPriceVersionById(id) {
 	const row = toCamel(getRawDb().prepare("SELECT * FROM price_versions WHERE id = ?").get(id));
@@ -2455,7 +2470,8 @@ function getPriceVersionsByIds(ids) {
 /**
 * 金额计算工具模块。
 * 所有业务金额计算统一使用 decimal.js，禁止使用 JS Number 浮点直接计算。
-* 金额、税额、价税合计均以「人民币分」整数存储；单价以规范化十进制字符串存储。
+* 金额、税额、价税合计均以「人民币分」整数存储；单价以「含税单价」规范化十进制字符串存储，
+* 计算不含税金额时由 taxExclusiveUnitPrice 反推（含税单价 ÷ 1.13）。
 */
 decimal_js.default.set({
 	rounding: decimal_js.default.ROUND_HALF_UP,
@@ -2463,8 +2479,10 @@ decimal_js.default.set({
 });
 var TAX_RATE_DECIMAL = "0.13";
 var TAX_RATE_FACTOR = new decimal_js.default("0.13");
+/** 价税合计系数 = 1 + 税率 = 1.13，含税单价 ÷ 该值得不含税单价 */
+var TAX_INCLUSIVE_FACTOR = new decimal_js.default(1).plus(TAX_RATE_FACTOR);
 /**
-* 规范化单价字符串：去除首尾空白，去除科学计数法，校验为正数。
+* 规范化含税单价字符串：去除首尾空白，去除科学计数法，校验为正数。
 * 小数位数超过 UNIT_PRICE_MAX_DECIMALS（13）位时自动四舍五入到 13 位（而非报错），
 * 避免导入文件因单价精度被整批阻断；单价以十进制字符串存储，无浮点损失。
 * 返回不含前导零的最简十进制字符串（保留有效小数）。
@@ -2476,10 +2494,34 @@ function normalizeUnitPrice(input) {
 	return d.toDecimalPlaces(13, decimal_js.default.ROUND_HALF_UP).toString();
 }
 /**
-* 计算金额（分）= 数量 × 不含税单价，四舍五入到 2 位。
+* 含税单价 -> 不含税单价（含税单价 ÷ 1.13），四舍五入到 13 位小数。
+* 用于销项导出填入金税模板的「商品单价」列（国税标准为不含税单价），
+* 以及由含税单价计算不含税金额。
+*/
+function taxExclusiveUnitPrice(taxInclusive) {
+	return new decimal_js.default(String(taxInclusive).trim()).div(TAX_INCLUSIVE_FACTOR).toDecimalPlaces(13, decimal_js.default.ROUND_HALF_UP).toString();
+}
+/**
+* 计算不含税金额（分）= 数量 ×（含税单价 ÷ 1.13），四舍五入到 2 位。
+* unitPriceDecimal 为含税单价，内部先经 taxExclusiveUnitPrice 反推不含税单价，
+* 保证「不含税单价 × 数量 = 不含税金额」与金税模板一致。
 */
 function calcAmountCent(quantity, unitPriceDecimal) {
-	return new decimal_js.default(quantity).times(new decimal_js.default(unitPriceDecimal)).toDecimalPlaces(2, decimal_js.default.ROUND_HALF_UP).times(100).round().toNumber();
+	const exclusive = new decimal_js.default(taxExclusiveUnitPrice(unitPriceDecimal));
+	return new decimal_js.default(quantity).times(exclusive).toDecimalPlaces(2, decimal_js.default.ROUND_HALF_UP).times(100).round().toNumber();
+}
+/** 销项开票默认金额系数（金额 = 含税单价 × 系数） */
+var OUTBOUND_AMOUNT_FACTOR = "1.09";
+/**
+* 销项开票金额（分）= 含税单价 × 数量 × 系数，四舍五入到 2 位。
+* 直接按含税单价乘固定系数，不另算税额/价税合计/不含税金额。
+*/
+function calcOutboundAmountCent(quantity, taxInclusiveUnitPrice, factor = OUTBOUND_AMOUNT_FACTOR) {
+	return new decimal_js.default(quantity).times(new decimal_js.default(taxInclusiveUnitPrice)).times(new decimal_js.default(factor)).toDecimalPlaces(2, decimal_js.default.ROUND_HALF_UP).times(100).round().toNumber();
+}
+/** 单价 × 系数（保留 13 位小数），用于销项导出「商品单价」列 = 含税单价 × 系数 */
+function scaleUnitPrice(unitPrice, factor) {
+	return new decimal_js.default(String(unitPrice)).times(new decimal_js.default(factor)).toDecimalPlaces(13, decimal_js.default.ROUND_HALF_UP).toString();
 }
 /**
 * 计算税额（分）= 金额（分）× 13%，四舍五入到 2 位。
@@ -2567,25 +2609,39 @@ function updateProduct(input) {
 	markDirty();
 	return getProductById(input.id);
 }
-/** 切换商品启用状态 */
-function toggleProductStatus(id) {
+/** 删除商品：校验库存为 0 且无销项/进项/补票记录后，连带删除其价格版本与库存流水 */
+function deleteProduct(id) {
 	const product = getProductById(id);
 	if (!product) throw new Error("商品不存在");
+	const raw = getRawDb();
+	const pvs = raw.prepare("SELECT id, stock_balance FROM price_versions WHERE product_id = ?").all(id);
+	if (pvs.some((pv) => pv.stock_balance !== 0)) throw new Error("存在库存不为 0 的价格版本，请先清空库存再删除");
+	const pvIds = pvs.map((pv) => pv.id);
+	if (pvIds.length > 0) {
+		const placeholders = pvIds.map(() => "?").join(",");
+		const refCheck = (table, label) => {
+			if (raw.prepare(`SELECT COUNT(*) as c FROM ${table} WHERE price_version_id IN (${placeholders})`).get(...pvIds).c > 0) throw new Error(`存在${label}记录，不能删除`);
+		};
+		refCheck("outbound_lines", "销项开票");
+		refCheck("inbound_lines", "进项");
+		refCheck("replenishment_export_lines", "月底补票");
+	}
 	const db = getDb();
-	const newStatus = product.status === "active" ? "inactive" : "active";
-	db.update(products).set({
-		status: newStatus,
-		updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-	}).where((0, drizzle_orm.eq)(products.id, id)).run();
-	recordAudit({
-		action: newStatus === "active" ? "product.activate" : "product.deactivate",
-		entityType: "product",
-		entityId: id,
-		summary: `${newStatus === "active" ? "启用" : "停用"}商品: ${product.name}`,
-		fieldChanges: [diffField("status", product.status, newStatus)]
-	});
-	markDirty();
-	return getProductById(id);
+	raw.transaction(() => {
+		if (pvIds.length > 0) {
+			const placeholders = pvIds.map(() => "?").join(",");
+			raw.prepare(`DELETE FROM inventory_ledger WHERE price_version_id IN (${placeholders})`).run(...pvIds);
+			raw.prepare(`DELETE FROM price_versions WHERE id IN (${placeholders})`).run(...pvIds);
+		}
+		db.delete(products).where((0, drizzle_orm.eq)(products.id, id)).run();
+		recordAudit({
+			action: "product.delete",
+			entityType: "product",
+			entityId: id,
+			summary: `删除商品: ${product.name}`
+		});
+		markDirty();
+	})();
 }
 /** 新增价格版本 */
 function createPriceVersion$2(input) {
@@ -2612,26 +2668,6 @@ function createPriceVersion$2(input) {
 		entityType: "price_version",
 		entityId: id,
 		summary: `新增价格版本: ${product.name} @ ${unitPriceDecimal}`
-	});
-	markDirty();
-	return getPriceVersionById(id);
-}
-/** 切换价格版本启用状态 */
-function togglePriceVersionStatus(id) {
-	const pv = getPriceVersionById(id);
-	if (!pv) throw new Error("价格版本不存在");
-	const db = getDb();
-	const newStatus = pv.status === "active" ? "inactive" : "active";
-	db.update(priceVersions).set({
-		status: newStatus,
-		updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-	}).where((0, drizzle_orm.eq)(priceVersions.id, id)).run();
-	recordAudit({
-		action: newStatus === "active" ? "price_version.activate" : "price_version.deactivate",
-		entityType: "price_version",
-		entityId: id,
-		summary: `${newStatus === "active" ? "启用" : "停用"}价格版本`,
-		fieldChanges: [diffField("status", pv.status, newStatus)]
 	});
 	markDirty();
 	return getPriceVersionById(id);
@@ -2952,14 +2988,11 @@ function registerCatalogIpc() {
 	registerHandler(IPC_CHANNELS.catalog.updateProduct, productUpsertSchema, (input) => {
 		return updateProduct(input);
 	});
-	registerHandler(IPC_CHANNELS.catalog.toggleProductStatus, null, (id) => {
-		return toggleProductStatus(id);
-	});
 	registerHandler(IPC_CHANNELS.catalog.createPriceVersion, priceVersionCreateSchema, (input) => {
 		return createPriceVersion$2(input);
 	});
-	registerHandler(IPC_CHANNELS.catalog.togglePriceVersionStatus, null, (id) => {
-		return togglePriceVersionStatus(id);
+	registerHandler(IPC_CHANNELS.catalog.deleteProduct, null, (id) => {
+		return deleteProduct(id);
 	});
 	registerHandler(IPC_CHANNELS.catalog.initialImportPreview, null, async (filePath) => {
 		if (getInitStatus().productInitialImportDone) throw new Error("商品首次导入已完成，不能重复执行");
@@ -3006,6 +3039,9 @@ function registerCatalogIpc() {
 	});
 	registerHandler("catalog.getPriceVersionsByIds", null, (ids) => {
 		return getPriceVersionsByIds(ids);
+	});
+	registerHandler(IPC_CHANNELS.catalog.getPriceVersionsByProduct, null, (id) => {
+		return getPriceVersionsByProduct(id);
 	});
 	registerHandler(IPC_CHANNELS.catalog.downloadTemplate, null, async (input, _sender) => {
 		const result = await electron.dialog.showSaveDialog({
@@ -3217,11 +3253,12 @@ async function executeOutboundExport(input) {
 	if (draft.validLines.length === 0) throw new Error("没有有效的开票行");
 	const customer = getCustomerById(input.customerId);
 	const sortedLines = [...draft.validLines].sort((a, b) => a.priceVersionId.localeCompare(b.priceVersionId));
-	const xlsxBuffer = await generateTaxTemplateXlsx(buildTaxLines(sortedLines));
+	const amountFactor = input.amountFactor ?? "1.09";
+	const xlsxBuffer = await generateTaxTemplateXlsx(buildTaxLines(sortedLines, amountFactor));
 	await validateTaxTemplateXlsx(xlsxBuffer, sortedLines.length);
 	const xlsxSha256 = computeSha256(xlsxBuffer);
 	const xlsxBase64 = xlsxToBase64(xlsxBuffer);
-	const totals = calculateTotals$1(sortedLines);
+	const totals = calculateTotals$1(sortedLines, amountFactor);
 	const batchId = (0, uuid.v7)();
 	const batchNo = generateBatchNo("OUT");
 	const exportedAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -3241,7 +3278,7 @@ async function executeOutboundExport(input) {
 			lineCount: sortedLines.length,
 			...totals
 		}).run();
-		for (const line of sortedLines) processOutboundLine(db, raw, batchId, batchNo, exportedAt, line);
+		for (const line of sortedLines) processOutboundLine(db, raw, batchId, batchNo, exportedAt, line, amountFactor);
 		recordAudit({
 			action: "outbound.export",
 			entityType: "outbound_batch",
@@ -3260,9 +3297,9 @@ async function executeOutboundExport(input) {
 	};
 }
 /** 构造税务模板行 */
-function buildTaxLines(lines) {
+function buildTaxLines(lines, factor) {
 	return lines.map((l) => {
-		const amountCent = calcAmountCent(l.quantity, l.unitPriceDecimal);
+		const amountCent = calcOutboundAmountCent(l.quantity, l.unitPriceDecimal, factor);
 		const product = getProductById(getPriceVersionById(l.priceVersionId).productId);
 		return {
 			name: escapeFormulaInjection(trimInvisible(l.name)),
@@ -3270,39 +3307,35 @@ function buildTaxLines(lines) {
 			model: escapeFormulaInjection(trimInvisible(l.model)),
 			unit: escapeFormulaInjection(trimInvisible(l.unit)),
 			quantity: l.quantity,
-			unitPriceDecimal: normalizeUnitPrice(l.unitPriceDecimal),
+			unitPriceDecimal: scaleUnitPrice(normalizeUnitPrice(l.unitPriceDecimal), factor),
 			amountYuan: centToYuan(amountCent),
 			taxRate: TAX_RATE_DECIMAL
 		};
 	});
 }
 /** 计算汇总金额 */
-function calculateTotals$1(lines) {
-	let totalQuantity = 0, totalAmountCent = 0, totalTaxCent = 0, totalCent = 0;
+function calculateTotals$1(lines, factor) {
+	let totalQuantity = 0, totalAmountCent = 0, totalCent = 0;
 	for (const line of lines) {
 		totalQuantity += line.quantity;
-		const amountCent = calcAmountCent(line.quantity, line.unitPriceDecimal);
-		const taxCent = calcTaxCent(amountCent);
+		const amountCent = calcOutboundAmountCent(line.quantity, line.unitPriceDecimal, factor);
 		totalAmountCent += amountCent;
-		totalTaxCent += taxCent;
-		totalCent += calcTotalCent(amountCent, taxCent);
+		totalCent += amountCent;
 	}
 	return {
 		totalQuantity,
 		totalAmountCent,
-		totalTaxCent,
+		totalTaxCent: 0,
 		totalCent
 	};
 }
 /** 处理单行：扣减库存、写明细、写流水 */
-function processOutboundLine(db, raw, batchId, batchNo, exportedAt, line) {
+function processOutboundLine(db, raw, batchId, batchNo, exportedAt, line, factor) {
 	const pvRow = raw.prepare("SELECT stock_balance FROM price_versions WHERE id = ?").get(line.priceVersionId);
 	if (!pvRow) throw new Error(`价格版本 ${line.priceVersionId} 不存在`);
 	const stockBefore = pvRow.stock_balance;
 	const stockAfter = stockBefore - line.quantity;
-	const amountCent = calcAmountCent(line.quantity, line.unitPriceDecimal);
-	const taxCent = calcTaxCent(amountCent);
-	const lineTotal = calcTotalCent(amountCent, taxCent);
+	const amountCent = calcOutboundAmountCent(line.quantity, line.unitPriceDecimal, factor);
 	const product = getProductById(getPriceVersionById(line.priceVersionId).productId);
 	db.insert(outboundLines).values({
 		id: (0, uuid.v7)(),
@@ -3316,8 +3349,8 @@ function processOutboundLine(db, raw, batchId, batchNo, exportedAt, line) {
 		taxRate: 13,
 		quantity: line.quantity,
 		amountCent,
-		taxCent,
-		totalCent: lineTotal,
+		taxCent: 0,
+		totalCent: amountCent,
 		stockBefore,
 		stockAfter
 	}).run();
@@ -3654,7 +3687,7 @@ async function generateReplenishmentExcel(lines) {
 			width: 12
 		},
 		{
-			header: "不含税单价",
+			header: "含税单价",
 			key: "unitPrice",
 			width: 15
 		},

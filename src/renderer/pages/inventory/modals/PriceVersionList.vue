@@ -42,7 +42,7 @@ const newPrice = ref('');
 async function loadPriceVersions(): Promise<void> {
   if (!props.productId) return;
   try {
-    priceVersions.value = await api.catalog.getPriceVersionsByIds([props.productId]);
+    priceVersions.value = await api.catalog.getPriceVersionsByProduct(props.productId);
   } catch {
     priceVersions.value = [];
   }
