@@ -60,6 +60,7 @@
     "directories": {
       "output": "release"
     },
+    "publish": null,
     "files": [
       "out/**/*",
       "resources/**/*"
