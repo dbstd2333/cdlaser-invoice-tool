@@ -20,6 +20,7 @@
 
 - 2026-07-31：把 `xlsx-populate` 全部替换为 **SheetJS 社区版**，从官方 CDN 安装（npm 上的 `xlsx` 长期停在 0.18.5 旧版）。
 - 安装命令：`pnpm add https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`（包名仍为 `xlsx`，版本 0.20.3）。
+- **lockfile integrity 坑（重要）**：从 CDN URL 安装 xlsx 后，`pnpm-lock.yaml` 的 `xlsx@https://cdn.sheetjs.com/...` 条目可能缺 `integrity` 字段，导致 CI 的 `pnpm install --frozen-lockfile` 报 `ERR_PNPM_MISSING_TARBALL_INTEGRITY`。修复：给该条目的 `resolution` 补上 `integrity: sha512-...`（下载 tarball 用 `openssl dgst -sha512 -binary | openssl base64 -A` 计算），或用 `pnpm install --no-frozen-lockfile` 重新生成 lockfile；改完需提交 `pnpm-lock.yaml`。已验证当前 integrity = `sha512-oLDq3jw7AcLqKWH2AhCpVTZl8mf6X2YReP+Neh0SJUzV/BdZYjth94tG5toiMB1PPrYtxOCfaoUCkvtuH+3AJA==`。
 - **关键限制**：SheetJS 社区版**不能写单元格样式**（加粗、填充、数字格式 `@`、数据校验、冻结窗格、自动筛选），仅列宽 `!cols` 可写。模板生成器因此丢失了表头加粗、文本格式保护等样式。
 - ESM 构建（vitest/Node ESM）不会自动加载 `fs`，读取/写入文件前必须 `XLSX.set_fs(fs)`（CJS 生产构建中该调用无害）。涉及文件：`src/main/excel/importers/parser-utils.ts`、`template-generator.ts`、`src/main/domains/inventory/replenishment-excel.ts`、`scripts/generate-template.ts`。
 - 读取端用 `XLSX.readFile(path,{cellDates:true})` + `sheet_to_json(ws,{header:1,raw:true})`，文本标识符存为字符串、数值存为 number，支撑超精度识别。
