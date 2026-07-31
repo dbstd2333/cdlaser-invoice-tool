@@ -25,21 +25,20 @@ export const IPC_CHANNELS = {
     downloadTemplate: 'customers.downloadTemplate',
     history: 'customers.history',
   },
-  // 商品与价格版本
+  // 商品
   catalog: {
-    listPriceVersions: 'catalog.listPriceVersions',
+    listProducts: 'catalog.listProducts',
     getProductById: 'catalog.getProductById',
     createProduct: 'catalog.createProduct',
     updateProduct: 'catalog.updateProduct',
-    createPriceVersion: 'catalog.createPriceVersion',
     deleteProduct: 'catalog.deleteProduct',
-    getPriceVersionsByProduct: 'catalog.getPriceVersionsByProduct',
     initialImportPreview: 'catalog.initialImportPreview',
     initialImportConfirm: 'catalog.initialImportConfirm',
     dailyImportPreview: 'catalog.dailyImportPreview',
     dailyImportConfirm: 'catalog.dailyImportConfirm',
     downloadTemplate: 'catalog.downloadTemplate',
     fieldHistory: 'catalog.fieldHistory',
+    stockSummary: 'catalog.stockSummary',
   },
   // 销项开票
   outbound: {
@@ -49,6 +48,7 @@ export const IPC_CHANNELS = {
     getDetail: 'outbound.getDetail',
     download: 'outbound.download',
     void: 'outbound.void',
+    monthlyTax: 'outbound.monthlyTax',
   },
   // 月底补票导出
   replenishment: {

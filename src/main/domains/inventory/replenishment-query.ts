@@ -21,7 +21,7 @@ function mapExport(row: typeof replenishmentExports.$inferSelect): Replenishment
 /** 将明细行映射为业务实体 */
 function mapExportLine(row: typeof replenishmentExportLines.$inferSelect): ReplenishmentExportLine {
   return {
-    id: row.id, exportId: row.exportId, priceVersionId: row.priceVersionId,
+    id: row.id, exportId: row.exportId, productId: row.productId,
     name: row.name, model: row.model, unit: row.unit, unitPriceDecimal: row.unitPriceDecimal,
     stockBalanceSnapshot: row.stockBalanceSnapshot, replenishmentQuantity: row.replenishmentQuantity,
     amountCent: row.amountCent, taxCent: row.taxCent, totalCent: row.totalCent,

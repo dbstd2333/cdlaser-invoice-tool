@@ -57,7 +57,7 @@ function collectDbHealth(): string {
     const integrityResult = raw.pragma('integrity_check') as Array<{ integrity_check: string }>;
     const integrityOk = integrityResult.length === 1 && integrityResult[0].integrity_check === 'ok';
     const { consistent, mismatches } = consistencyCheck();
-    const tables = ['customers', 'products', 'price_versions', 'outbound_batches', 'outbound_lines', 'inbound_batches', 'inbound_lines', 'inventory_ledger', 'audit_events'];
+    const tables = ['customers', 'products', 'outbound_batches', 'outbound_lines', 'inbound_batches', 'inbound_lines', 'inventory_ledger', 'audit_events'];
     const counts: Record<string, number> = {};
     for (const table of tables) {
       const row = raw.prepare(`SELECT COUNT(*) as cnt FROM ${table}`).get() as { cnt: number };

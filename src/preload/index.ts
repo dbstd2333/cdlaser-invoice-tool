@@ -4,8 +4,6 @@ import type {
   Customer,
   PageResponse,
   FieldHistoryEntry,
-  PriceVersion,
-  PriceVersionRow,
   Product,
   OutboundBatch,
   OutboundLine,
@@ -24,6 +22,7 @@ import type {
   BackupHistoryItem,
   CosConfig,
 } from '../shared/contracts/preview-types';
+import type { StockSummary } from '../shared/schemas/index';
 
 /**
  * 预加载脚本 - 通过 contextBridge 暴露按业务划分的最小 API。
@@ -67,19 +66,18 @@ const api = {
     downloadTemplate: () => invoke<{ saved: boolean; path?: string }>(IPC_CHANNELS.customers.downloadTemplate),
   },
   catalog: {
-    listPriceVersions: (params: unknown) => invoke<PageResponse<PriceVersionRow>>(IPC_CHANNELS.catalog.listPriceVersions, params),
+    listProducts: (params: unknown) => invoke<PageResponse<Product>>(IPC_CHANNELS.catalog.listProducts, params),
     getProductById: (id: string) => invoke<Product | null>(IPC_CHANNELS.catalog.getProductById, id),
     createProduct: (params: unknown) => invoke<Product>(IPC_CHANNELS.catalog.createProduct, params),
     updateProduct: (params: unknown) => invoke<Product>(IPC_CHANNELS.catalog.updateProduct, params),
-    createPriceVersion: (params: unknown) => invoke<PriceVersion>(IPC_CHANNELS.catalog.createPriceVersion, params),
     deleteProduct: (id: string) => invoke<void>(IPC_CHANNELS.catalog.deleteProduct, id),
     initialImportPreview: (filePath: string) => invoke<{ token: string; preview: CatalogImportPreviewResult }>(IPC_CHANNELS.catalog.initialImportPreview, filePath),
-    initialImportConfirm: (token: string) => invoke<{ products: number; priceVersions: number }>(IPC_CHANNELS.catalog.initialImportConfirm, token),
+    initialImportConfirm: (token: string) => invoke<{ products: number; updatedProducts: number }>(IPC_CHANNELS.catalog.initialImportConfirm, token),
     dailyImportPreview: (filePath: string) => invoke<{ token: string; preview: CatalogImportPreviewResult }>(IPC_CHANNELS.catalog.dailyImportPreview, filePath),
-    dailyImportConfirm: (token: string) => invoke<{ products: number; priceVersions: number }>(IPC_CHANNELS.catalog.dailyImportConfirm, token),
+    dailyImportConfirm: (token: string) => invoke<{ products: number; updatedProducts: number }>(IPC_CHANNELS.catalog.dailyImportConfirm, token),
     fieldHistory: (params: unknown) => invoke<{ rows: FieldHistoryEntry[]; total: number }>(IPC_CHANNELS.catalog.fieldHistory, params),
-    getPriceVersionsByIds: (ids: string[]) => invoke<PriceVersion[]>('catalog.getPriceVersionsByIds', ids),
-    getPriceVersionsByProduct: (productId: string) => invoke<PriceVersion[]>(IPC_CHANNELS.catalog.getPriceVersionsByProduct, productId),
+    stockSummary: () => invoke<StockSummary>(IPC_CHANNELS.catalog.stockSummary, {}),
+    getProductsByIds: (ids: string[]) => invoke<Product[]>('catalog.getProductsByIds', ids),
     downloadTemplate: (isInitial: boolean) =>
       invoke<{ saved: boolean; path?: string }>(IPC_CHANNELS.catalog.downloadTemplate, { isInitial }),
   },
@@ -90,6 +88,7 @@ const api = {
     getDetail: (id: string) => invoke<{ batch: OutboundBatch; lines: OutboundLine[] } | null>(IPC_CHANNELS.outbound.getDetail, id),
     download: (id: string) => invoke<{ saved: boolean; path?: string }>(IPC_CHANNELS.outbound.download, id),
     void: (id: string, reason: string) => invoke<OutboundBatch>(IPC_CHANNELS.outbound.void, { id, reason }),
+    monthlyTax: () => invoke<{ taxCent: number }>(IPC_CHANNELS.outbound.monthlyTax, {}),
   },
   replenishment: {
     preview: () => invoke<{ lines: ReplenishmentPreviewLine[]; snapshotAt: string }>(IPC_CHANNELS.replenishment.preview),
@@ -107,9 +106,9 @@ const api = {
     void: (id: string, reason: string) => invoke<InboundBatch>(IPC_CHANNELS.inbound.void, { id, reason }),
   },
   inventory: {
-    ledger: (priceVersionId: string, page: number, pageSize: number) => invoke<{ rows: InventoryLedger[]; total: number }>(IPC_CHANNELS.inventory.ledger, { priceVersionId, page, pageSize }),
+    ledger: (params: unknown) => invoke<{ rows: InventoryLedger[]; total: number }>(IPC_CHANNELS.inventory.ledger, params),
     adjust: (params: unknown) => invoke<{ newBalance: number; ledgerId: string }>(IPC_CHANNELS.inventory.adjust, params),
-    consistencyCheck: () => invoke<{ consistent: boolean; mismatches: Array<{ priceVersionId: string; cachedBalance: number; recomputedBalance: number | null }> }>(IPC_CHANNELS.inventory.consistencyCheck),
+    consistencyCheck: () => invoke<{ consistent: boolean; mismatches: Array<{ productId: string; cachedBalance: number; recomputedBalance: number | null }> }>(IPC_CHANNELS.inventory.consistencyCheck),
   },
   backup: {
     getStatus: () => invoke<BackupStatus>(IPC_CHANNELS.backup.getStatus),

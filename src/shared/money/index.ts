@@ -102,6 +102,13 @@ export function roundCentToWholeYuan(amountCent: number): number {
     .toNumber();
 }
 
+/** 将含税单价四舍五入到整数元。 */
+export function roundUnitPriceToWholeYuan(unitPrice: string | number): string {
+  return new Decimal(String(unitPrice))
+    .toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
+    .toString();
+}
+
 /** 单价 × 系数（保留 13 位小数），用于销项导出「商品单价」列 = 含税单价 × 系数 */
 export function scaleUnitPrice(unitPrice: string | number | Decimal, factor: string | number): string {
   return new Decimal(String(unitPrice)).times(new Decimal(factor)).toDecimalPlaces(UNIT_PRICE_MAX_DECIMALS, Decimal.ROUND_HALF_UP).toString();

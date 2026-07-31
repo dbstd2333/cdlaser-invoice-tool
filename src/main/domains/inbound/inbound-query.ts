@@ -1,5 +1,5 @@
 import { getDb, getRawDb } from '../../db/connection';
-import { inboundBatches, inboundLines, priceVersions } from '../../db/schema/index';
+import { inboundBatches, inboundLines, products } from '../../db/schema/index';
 import { toCamel, toCamelList } from '../../db/case-mapper';
 import { eq } from 'drizzle-orm';
 import type { InboundBatch, InboundLine, PageResponse } from '@shared/contracts/types';
@@ -28,7 +28,7 @@ function mapInboundLine(row: typeof inboundLines.$inferSelect): InboundLine {
   return {
     id: row.id, batchId: row.batchId, sourceSheet: row.sourceSheet, sourceRow: row.sourceRow,
     invoiceDate: row.invoiceDate, invoiceNo: row.invoiceNo, sellerName: row.sellerName,
-    priceVersionId: row.priceVersionId, name: row.name, model: row.model, unit: row.unit,
+    productId: row.productId, name: row.name, model: row.model, unit: row.unit,
     unitPriceDecimal: row.unitPriceDecimal, quantity: row.quantity,
     amountCent: row.amountCent, taxCent: row.taxCent, totalCent: row.totalCent,
   };
@@ -106,18 +106,18 @@ function reverseInboundLine(
   reason: string,
   line: typeof inboundLines.$inferSelect,
 ): void {
-  const pvRow = raw.prepare('SELECT stock_balance FROM price_versions WHERE id = ?').get(line.priceVersionId) as { stock_balance: number } | undefined;
-  if (!pvRow) return;
+  const productRow = raw.prepare('SELECT stock_balance FROM products WHERE id = ?').get(line.productId) as { stock_balance: number } | undefined;
+  if (!productRow) return;
 
-  const balanceBefore = pvRow.stock_balance;
+  const balanceBefore = productRow.stock_balance;
   const balanceAfter = balanceBefore - line.quantity;
 
   appendLedger({
-    priceVersionId: line.priceVersionId, changeQuantity: -line.quantity, balanceBefore,
+    productId: line.productId, changeQuantity: -line.quantity, balanceBefore,
     sourceType: 'inbound_void', sourceId: batchId, reason: `进项作废 ${batchNo}: ${reason}`,
   });
 
-  db.update(priceVersions)
+  db.update(products)
     .set({ stockBalance: balanceAfter, updatedAt: new Date().toISOString() })
-    .where(eq(priceVersions.id, line.priceVersionId)).run();
+    .where(eq(products.id, line.productId)).run();
 }

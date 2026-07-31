@@ -51,25 +51,20 @@ export const productUpsertSchema = z.object({
   model: z.string().min(1, '规格型号必填'),
   unit: z.string().min(1, '单位必填').max(20),
   taxClassificationCode: z.string().min(1, '税收分类编码必填').max(19),
+  unitPriceDecimal: z.string().min(1, '含税单价必填'),
+  taxRate: z.number().int().min(0).max(100).optional(),
   remark: z.string().nullable().optional(),
   status: z.enum(['active', 'inactive']).optional(),
 });
 
-/** 价格版本新增 */
-export const priceVersionCreateSchema = z.object({
-  productId: z.string().min(1),
-  unitPriceDecimal: z.string().min(1),
-});
-
-/** 商品价格版本查询 */
-export const priceVersionQuerySchema = z.object({
+/** 商品库存查询 */
+export const productQuerySchema = z.object({
   keyword: z.string().optional(),
   name: z.string().optional(),
   model: z.string().optional(),
   stockStatus: z.enum(['positive', 'zero', 'negative', 'all']).optional(),
   dataStatus: z.enum(['complete', 'incomplete', 'all']).optional(),
   productStatus: z.enum(['active', 'inactive', 'all']).optional(),
-  priceVersionStatus: z.enum(['active', 'inactive', 'all']).optional(),
   minPrice: z.string().optional(),
   maxPrice: z.string().optional(),
   ...pageRequestSchema.shape,
@@ -77,7 +72,7 @@ export const priceVersionQuerySchema = z.object({
 
 /** 销项开票行 */
 export const outboundLineInputSchema = z.object({
-  priceVersionId: z.string().min(1),
+  productId: z.string().min(1),
   quantity: z.number().int().positive('数量必须为正整数'),
   amountCent: z.number().int().positive('金额必须大于 0').optional(),
 });
@@ -112,16 +107,25 @@ export const inboundConfirmSchema = z.object({
 
 /** 库存调整 */
 export const inventoryAdjustSchema = z.object({
-  priceVersionId: z.string().min(1),
+  productId: z.string().min(1),
   changeQuantity: z.number().int().refine((v) => v !== 0, '调整量必须为非零整数'),
   reason: z.string().min(1, '调整原因必填'),
 });
 
 /** 库存流水查询 */
 export const ledgerQuerySchema = z.object({
-  priceVersionId: z.string().min(1),
+  productId: z.string().min(1),
   ...pageRequestSchema.shape,
 });
+
+/** 库存汇总（按 stock_balance 符号聚合） */
+export const stockSummarySchema = z.object({});
+
+export interface StockSummary {
+  positiveStock: number;
+  negativeStock: number;
+  totalStock: number;
+}
 
 /** 字段历史查询 */
 export const fieldHistoryQuerySchema = z.object({
@@ -163,8 +167,7 @@ export const restoreRequestSchema = z.object({
 export type CustomerUpsertInput = z.infer<typeof customerUpsertSchema>;
 export type CustomerQueryInput = z.infer<typeof customerQuerySchema>;
 export type ProductUpsertInput = z.infer<typeof productUpsertSchema>;
-export type PriceVersionCreateInput = z.infer<typeof priceVersionCreateSchema>;
-export type PriceVersionQueryInput = z.infer<typeof priceVersionQuerySchema>;
+export type ProductQueryInput = z.infer<typeof productQuerySchema>;
 export type OutboundExportInput = z.infer<typeof outboundExportSchema>;
 export type OutboundQueryInput = z.infer<typeof outboundQuerySchema>;
 export type InboundPreviewInput = z.infer<typeof inboundPreviewSchema>;

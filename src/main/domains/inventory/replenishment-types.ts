@@ -3,7 +3,7 @@
  */
 
 export interface ReplenishmentPreviewLine {
-  priceVersionId: string;
+  productId: string;
   name: string;
   model: string;
   unit: string;

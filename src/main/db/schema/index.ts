@@ -43,6 +43,9 @@ export const products = sqliteTable(
     modelNormalized: text('model_normalized').notNull(),
     unit: text('unit').notNull(),
     taxClassificationCode: text('tax_classification_code').notNull(),
+    unitPriceDecimal: text('unit_price_decimal').notNull(),
+    taxRate: integer('tax_rate').notNull().default(13),
+    stockBalance: integer('stock_balance').notNull().default(0),
     dataStatus: text('data_status', { enum: ['complete', 'incomplete'] }).notNull().default('complete'),
     status: text('status', { enum: ['active', 'inactive'] }).notNull().default('active'),
     remark: text('remark'),
@@ -51,27 +54,8 @@ export const products = sqliteTable(
   },
   (table) => ({
     nameModelUnique: uniqueIndex('products_name_model_unique').on(table.nameNormalized, table.modelNormalized),
-  }),
-);
-
-/** 价格版本表 */
-export const priceVersions = sqliteTable(
-  'price_versions',
-  {
-    id: text('id').primaryKey(),
-    productId: text('product_id').notNull().references(() => products.id),
-    unitPriceDecimal: text('unit_price_decimal').notNull(),
-    taxRate: integer('tax_rate').notNull().default(13),
-    stockBalance: integer('stock_balance').notNull().default(0),
-    status: text('status', { enum: ['active', 'inactive'] }).notNull().default('active'),
-    createdAt: text('created_at').notNull(),
-    updatedAt: text('updated_at').notNull(),
-  },
-  (table) => ({
-    productPriceUnique: uniqueIndex('price_versions_product_price_unique').on(table.productId, table.unitPriceDecimal),
-    productIdx: index('price_versions_product_idx').on(table.productId),
-    statusIdx: index('price_versions_status_idx').on(table.status),
-    stockIdx: index('price_versions_stock_idx').on(table.stockBalance),
+    statusIdx: index('products_status_idx').on(table.status),
+    stockIdx: index('products_stock_idx').on(table.stockBalance),
   }),
 );
 
@@ -108,7 +92,7 @@ export const outboundLines = sqliteTable(
   {
     id: text('id').primaryKey(),
     batchId: text('batch_id').notNull().references(() => outboundBatches.id),
-    priceVersionId: text('price_version_id').notNull(),
+    productId: text('product_id').notNull(),
     name: text('name').notNull(),
     taxClassificationCode: text('tax_classification_code').notNull(),
     model: text('model').notNull(),
@@ -124,7 +108,7 @@ export const outboundLines = sqliteTable(
   },
   (table) => ({
     batchIdx: index('outbound_lines_batch_idx').on(table.batchId),
-    priceVersionIdx: index('outbound_lines_price_version_idx').on(table.priceVersionId),
+    productIdx: index('outbound_lines_product_idx').on(table.productId),
   }),
 );
 
@@ -164,7 +148,7 @@ export const inboundLines = sqliteTable(
     invoiceDate: text('invoice_date'),
     invoiceNo: text('invoice_no'),
     sellerName: text('seller_name'),
-    priceVersionId: text('price_version_id').notNull(),
+    productId: text('product_id').notNull(),
     name: text('name').notNull(),
     model: text('model').notNull(),
     unit: text('unit').notNull(),
@@ -176,7 +160,7 @@ export const inboundLines = sqliteTable(
   },
   (table) => ({
     batchIdx: index('inbound_lines_batch_idx').on(table.batchId),
-    priceVersionIdx: index('inbound_lines_price_version_idx').on(table.priceVersionId),
+    productIdx: index('inbound_lines_product_idx').on(table.productId),
   }),
 );
 
@@ -207,7 +191,7 @@ export const replenishmentExportLines = sqliteTable(
   {
     id: text('id').primaryKey(),
     exportId: text('export_id').notNull().references(() => replenishmentExports.id),
-    priceVersionId: text('price_version_id').notNull(),
+    productId: text('product_id').notNull(),
     name: text('name').notNull(),
     model: text('model').notNull(),
     unit: text('unit').notNull(),
@@ -243,7 +227,7 @@ export const inventoryLedger = sqliteTable(
   'inventory_ledger',
   {
     id: text('id').primaryKey(),
-    priceVersionId: text('price_version_id').notNull(),
+    productId: text('product_id').notNull(),
     changeQuantity: integer('change_quantity').notNull(),
     balanceBefore: integer('balance_before').notNull(),
     balanceAfter: integer('balance_after').notNull(),
@@ -255,7 +239,7 @@ export const inventoryLedger = sqliteTable(
     createdAt: text('created_at').notNull(),
   },
   (table) => ({
-    priceVersionIdx: index('inventory_ledger_price_version_idx').on(table.priceVersionId, table.createdAt),
+    productIdx: index('inventory_ledger_product_idx').on(table.productId, table.createdAt),
     sourceIdx: index('inventory_ledger_source_idx').on(table.sourceType, table.sourceId),
   }),
 );
@@ -301,7 +285,6 @@ export const appSettings = sqliteTable('app_settings', {
 
 export type CustomerRow = typeof customers.$inferSelect;
 export type ProductRow = typeof products.$inferSelect;
-export type PriceVersionRow = typeof priceVersions.$inferSelect;
 export type OutboundBatchRow = typeof outboundBatches.$inferSelect;
 export type OutboundLineRow = typeof outboundLines.$inferSelect;
 export type InboundBatchRow = typeof inboundBatches.$inferSelect;

@@ -1,7 +1,7 @@
 import { v7 as uuidv7 } from 'uuid';
 import { readFileSync } from 'node:fs';
 import { getDb, getRawDb } from '../../db/connection';
-import { inboundBatches, inboundLines, products, priceVersions } from '../../db/schema/index';
+import { inboundBatches, inboundLines, products } from '../../db/schema/index';
 import { eq } from 'drizzle-orm';
 import { normalizeKey, generateBatchNo } from '@shared/contracts/normalize';
 import { recordAudit } from '../audit/audit-service';
@@ -80,41 +80,35 @@ function insertInboundBatch(db: ReturnType<typeof getDb>, batchId: string, batch
   }).run();
 }
 
-/** 处理单行进项：自动建档、创建价格版本、写明细、库存流水 */
+/** 处理单行进项：自动建档或更新含税单价，再写明细和库存流水。 */
 function processInboundLine(db: ReturnType<typeof getDb>, raw: ReturnType<typeof getRawDb>, batchId: string, batchNo: string, line: InboundPreviewLine): void {
   let productId = line.productId;
-  let priceVersionId = line.priceVersionId;
 
   // 自动创建新商品
   if (line.isNewProduct && !productId) {
     productId = createAutoProduct(db, batchId, line);
   }
 
-  // 创建价格版本
-  if (!priceVersionId) {
-    priceVersionId = createPriceVersion(db, productId!, line.unitPriceDecimal);
-  }
-
   // 读取当前余额并写入明细和流水
-  const balanceBefore = getStockBalance(raw, priceVersionId);
+  const balanceBefore = getStockBalance(raw, productId!);
   const balanceAfter = balanceBefore + line.quantity;
 
   db.insert(inboundLines).values({
     id: uuidv7(), batchId, sourceSheet: line.sourceSheet, sourceRow: line.sourceRow,
     invoiceDate: line.invoiceDate, invoiceNo: line.invoiceNo, sellerName: line.sellerName,
-    priceVersionId: priceVersionId!, name: line.name, model: line.model, unit: line.unit,
+    productId: productId!, name: line.name, model: line.model, unit: line.unit,
     unitPriceDecimal: line.unitPriceDecimal, quantity: line.quantity,
     amountCent: line.amountCent, taxCent: line.taxCent, totalCent: line.totalCent,
   }).run();
 
   appendLedger({
-    priceVersionId: priceVersionId!, changeQuantity: line.quantity, balanceBefore,
+    productId: productId!, changeQuantity: line.quantity, balanceBefore,
     sourceType: 'inbound', sourceId: batchId, reason: `月初进项导入 ${batchNo}`,
   });
 
-  db.update(priceVersions)
-    .set({ stockBalance: balanceAfter, updatedAt: new Date().toISOString() })
-    .where(eq(priceVersions.id, priceVersionId!))
+  db.update(products)
+    .set({ unitPriceDecimal: line.unitPriceDecimal, stockBalance: balanceAfter, updatedAt: new Date().toISOString() })
+    .where(eq(products.id, productId!))
     .run();
 }
 
@@ -125,7 +119,8 @@ function createAutoProduct(db: ReturnType<typeof getDb>, batchId: string, line: 
   db.insert(products).values({
     id: productId, name: line.name, nameNormalized: normalizeKey(line.name),
     model: line.model, modelNormalized: normalizeKey(line.model), unit: line.unit,
-    taxClassificationCode: '', dataStatus: 'incomplete', status: 'active', remark: null,
+    taxClassificationCode: '', unitPriceDecimal: line.unitPriceDecimal, taxRate: 13,
+    stockBalance: 0, dataStatus: 'incomplete', status: 'active', remark: null,
     createdAt: now, updatedAt: now,
   }).run();
 
@@ -136,19 +131,8 @@ function createAutoProduct(db: ReturnType<typeof getDb>, batchId: string, line: 
   return productId;
 }
 
-/** 创建价格版本 */
-function createPriceVersion(db: ReturnType<typeof getDb>, productId: string, unitPriceDecimal: string): string {
-  const priceVersionId = uuidv7();
-  const now = new Date().toISOString();
-  db.insert(priceVersions).values({
-    id: priceVersionId, productId, unitPriceDecimal, taxRate: 13,
-    stockBalance: 0, status: 'active', createdAt: now, updatedAt: now,
-  }).run();
-  return priceVersionId;
-}
-
-/** 读取价格版本当前库存 */
-function getStockBalance(raw: ReturnType<typeof getRawDb>, priceVersionId: string): number {
-  const pvRow = raw.prepare('SELECT stock_balance FROM price_versions WHERE id = ?').get(priceVersionId) as { stock_balance: number } | undefined;
-  return pvRow?.stock_balance ?? 0;
+/** 读取商品当前库存。 */
+function getStockBalance(raw: ReturnType<typeof getRawDb>, productId: string): number {
+  const row = raw.prepare('SELECT stock_balance FROM products WHERE id = ?').get(productId) as { stock_balance: number } | undefined;
+  return row?.stock_balance ?? 0;
 }

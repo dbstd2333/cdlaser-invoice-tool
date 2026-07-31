@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import XlsxPopulate from 'xlsx-populate';
+import * as XLSX from 'xlsx';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -20,23 +20,16 @@ describe('客户导入解析器', () => {
 
   it('应接受长文本标识符并识别超精度数值单元格', async () => {
     const filePath = join(tempDirectory, '客户导入.xlsx');
-    const wb = await XlsxPopulate.fromBlankAsync();
-    const sheet = wb.addSheet('客户信息');
-    wb.deleteSheet('Sheet1');
 
-    const headers = ['客户名称', '纳税人识别号', '银行账号', '是否默认地址'];
-    headers.forEach((h, i) => sheet.cell(1, i + 1).value(h));
-    // 文本标识符（应识别为文本，不触发精度告警）
-    sheet.cell(2, 1).value('文本客户');
-    sheet.cell(2, 2).value('123456789012345678');
-    sheet.cell(2, 3).value('12345678901234567890');
-    sheet.cell(2, 4).value('Y');
-    // 数值标识符（应触发超精度告警）
-    sheet.cell(3, 1).value('数值客户');
-    sheet.cell(3, 2).value(1234567890123456);
-    sheet.cell(3, 3).value(1234567890123456);
-    sheet.cell(3, 4).value('N');
-    await wb.toFileAsync(filePath);
+    const data = [
+      ['客户名称', '纳税人识别号', '银行账号', '是否默认地址'],
+      ['文本客户', '123456789012345678', '12345678901234567890', 'Y'],
+      ['数值客户', 1234567890123456, 1234567890123456, 'N'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '客户信息');
+    XLSX.writeFile(wb, filePath);
 
     const rows = await parseCustomerExcel(filePath);
 

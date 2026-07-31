@@ -36,8 +36,7 @@ export interface InboundPreviewLine {
   totalCent: number;
   isNewProduct: boolean;
   productId: string | null;
-  priceVersionId: string | null;
-  isNewPriceVersion: boolean;
+  priceChanged: boolean;
   matched: boolean;
   errors: string[];
 }
@@ -61,7 +60,7 @@ export interface InboundPreviewResult {
   totalTaxCent: number;
   totalCent: number;
   newProductCount: number;
-  newPriceVersionCount: number;
+  updatedProductCount: number;
 }
 
 export type { InboundBatch, InboundLine };

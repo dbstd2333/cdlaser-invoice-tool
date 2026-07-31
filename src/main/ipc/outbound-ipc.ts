@@ -13,6 +13,7 @@ import {
   getOutboundDetail,
   getOutboundXlsx,
   voidOutboundBatch,
+  getMonthlyTaxCent,
 } from '../domains/outbound/outbound-service';
 import { rename, unlink, writeFile } from 'node:fs/promises';
 
@@ -34,7 +35,7 @@ export function registerOutboundIpc(): void {
   });
 
   // 执行导出：生成 XLSX -> 保存对话框 -> 写入文件 -> 事务写入
-  registerHandler(IPC_CHANNELS.outbound.export, outboundExportSchema, async (input, sender: WebContents) => {
+  registerHandler(IPC_CHANNELS.outbound.export, outboundExportSchema, async (input, _sender: WebContents) => {
     // 先执行导出事务生成 XLSX 和数据库记录
     const result = await executeOutboundExport(input);
 
@@ -87,7 +88,7 @@ export function registerOutboundIpc(): void {
   });
 
   // 重新下载原始 Excel
-  registerHandler(IPC_CHANNELS.outbound.download, null, async (id: string, sender: WebContents) => {
+  registerHandler(IPC_CHANNELS.outbound.download, null, async (id: string, _sender: WebContents) => {
     const xlsxData = getOutboundXlsx(id);
     if (!xlsxData) throw new Error('开票记录不存在');
     const saveResult = await dialog.showSaveDialog({
@@ -102,5 +103,10 @@ export function registerOutboundIpc(): void {
 
   registerHandler(IPC_CHANNELS.outbound.void, voidRequestSchema, (input) => {
     return voidOutboundBatch(input.id, input.reason);
+  });
+
+  // 本月有效票税额合计
+  registerHandler(IPC_CHANNELS.outbound.monthlyTax, null, () => {
+    return { taxCent: getMonthlyTaxCent() };
   });
 }

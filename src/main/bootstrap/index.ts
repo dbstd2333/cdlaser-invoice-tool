@@ -1,6 +1,5 @@
-import { app, BrowserWindow, shell, Menu, dialog } from 'electron';
+import { app, BrowserWindow, shell, dialog } from 'electron';
 import { resolve } from 'node:path';
-import { existsSync } from 'node:fs';
 import log from 'electron-log/main';
 import { initDatabase, closeDatabase } from '../db/connection';
 import { registerAllowedWindow } from '../security/ipc-security';
@@ -57,13 +56,17 @@ function createWindow(): void {
   registerAllowedWindow(mainWindow);
 
   // 设置 CSP
+  // 开发模式需放行 'unsafe-inline'：Vite + @vitejs/plugin-react 会注入 React Fast Refresh 内联 preamble 脚本，
+  // 严格 CSP 会拦截该内联脚本，导致 "can't detect preamble" 错误。生产模式保持严格限制。
+  const isDev = !app.isPackaged;
+  const cspHeader = isDev
+    ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'"
+    : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'";
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [
-          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'",
-        ],
+        'Content-Security-Policy': [cspHeader],
       },
     });
   });
@@ -90,7 +93,6 @@ function createWindow(): void {
   });
 
   // 加载渲染进程
-  const isDev = !app.isPackaged;
   if (isDev) {
     const devUrl = process.env['VITE_DEV_SERVER_URL'] || 'http://localhost:5173';
     mainWindow.loadURL(devUrl);

@@ -1,12 +1,14 @@
 import { v7 as uuidv7 } from 'uuid';
 import { getDb, getRawDb } from '../../db/connection';
-import { outboundBatches, outboundLines, priceVersions } from '../../db/schema/index';
+import { outboundBatches, outboundLines, products } from '../../db/schema/index';
 import { eq } from 'drizzle-orm';
 import type { OutboundExportInput } from '@shared/schemas/index';
 import type { CustomerSnapshot } from '@shared/contracts/types';
 import {
   amountCentToUnitPrice,
   calcOutboundAmountCent,
+  calcTaxCent,
+  calcTotalCent,
   centToYuan,
   normalizeUnitPrice,
   OUTBOUND_AMOUNT_FACTOR,
@@ -24,7 +26,7 @@ import {
   computeSha256,
   type TaxTemplateLine,
 } from '../../excel/tax-template/template-writer';
-import { getProductById, getPriceVersionById } from '../catalog/catalog-service';
+import { getProductById } from '../catalog/catalog-service';
 import { getCustomerById } from '../customers/customer-service';
 import { validateDraft } from './outbound-validate';
 import type { OutboundExportResult } from './outbound-types';
@@ -41,8 +43,8 @@ export async function executeOutboundExport(input: OutboundExportInput): Promise
   if (draft.validLines.length === 0) throw new Error('没有有效的开票行');
 
   const customer = getCustomerById(input.customerId)!;
-  // 按稳定顺序排列（priceVersionId 升序），确保库存扣减顺序确定
-  const sortedLines = [...draft.validLines].sort((a, b) => a.priceVersionId.localeCompare(b.priceVersionId));
+  // 按商品 ID 稳定排序，确保库存扣减顺序确定。
+  const sortedLines = [...draft.validLines].sort((a, b) => a.productId.localeCompare(b.productId));
   const amountFactor = input.amountFactor ?? OUTBOUND_AMOUNT_FACTOR;
 
   // 生成 XLSX
@@ -86,11 +88,10 @@ export async function executeOutboundExport(input: OutboundExportInput): Promise
 }
 
 /** 构造税务模板行 */
-function buildTaxLines(lines: Array<{ priceVersionId: string; name: string; model: string; unit: string; unitPriceDecimal: string; quantity: number; amountCent?: number }>, factor: string): TaxTemplateLine[] {
+function buildTaxLines(lines: Array<{ productId: string; name: string; model: string; unit: string; unitPriceDecimal: string; quantity: number; amountCent?: number }>, factor: string): TaxTemplateLine[] {
   return lines.map((l) => {
     const amountCent = resolveLineAmountCent(l, factor);
-    const pv = getPriceVersionById(l.priceVersionId)!;
-    const product = getProductById(pv.productId)!;
+    const product = getProductById(l.productId)!;
     return {
       name: escapeFormulaInjection(trimInvisible(l.name)),
       taxClassificationCode: product.taxClassificationCode,
@@ -106,18 +107,23 @@ function buildTaxLines(lines: Array<{ priceVersionId: string; name: string; mode
   });
 }
 
-/** 计算汇总金额 */
+/** 计算汇总金额（PRD §7.5：税额=金额×13%，价税合计=金额+税额） */
 function calculateTotals(lines: Array<{ quantity: number; unitPriceDecimal: string; amountCent?: number }>, factor: string): {
   totalQuantity: number; totalAmountCent: number; totalTaxCent: number; totalCent: number;
 } {
-  let totalQuantity = 0, totalAmountCent = 0, totalCent = 0;
+  let totalQuantity = 0, totalAmountCent = 0, totalTaxCent = 0;
   for (const line of lines) {
     totalQuantity += line.quantity;
     const amountCent = resolveLineAmountCent(line, factor);
     totalAmountCent += amountCent;
-    totalCent += amountCent;
+    totalTaxCent += calcTaxCent(amountCent);
   }
-  return { totalQuantity, totalAmountCent, totalTaxCent: 0, totalCent };
+  return {
+    totalQuantity,
+    totalAmountCent,
+    totalTaxCent,
+    totalCent: calcTotalCent(totalAmountCent, totalTaxCent),
+  };
 }
 
 /** 处理单行：扣减库存、写明细、写流水 */
@@ -127,35 +133,35 @@ function processOutboundLine(
   batchId: string,
   batchNo: string,
   exportedAt: string,
-  line: { priceVersionId: string; quantity: number; unitPriceDecimal: string; name: string; amountCent?: number },
+  line: { productId: string; quantity: number; unitPriceDecimal: string; name: string; amountCent?: number },
   factor: string,
 ): void {
-  const pvRow = raw.prepare('SELECT stock_balance FROM price_versions WHERE id = ?').get(line.priceVersionId) as { stock_balance: number } | undefined;
-  if (!pvRow) throw new Error(`价格版本 ${line.priceVersionId} 不存在`);
+  const productRow = raw.prepare('SELECT stock_balance FROM products WHERE id = ?').get(line.productId) as { stock_balance: number } | undefined;
+  if (!productRow) throw new Error(`商品 ${line.productId} 不存在`);
 
-  const stockBefore = pvRow.stock_balance;
+  const stockBefore = productRow.stock_balance;
   const stockAfter = stockBefore - line.quantity;
   const amountCent = resolveLineAmountCent(line, factor);
 
-  const product = getProductById(getPriceVersionById(line.priceVersionId)!.productId)!;
+  const product = getProductById(line.productId)!;
 
   db.insert(outboundLines).values({
-    id: uuidv7(), batchId, priceVersionId: line.priceVersionId,
+    id: uuidv7(), batchId, productId: line.productId,
     name: product.name, taxClassificationCode: product.taxClassificationCode,
     model: product.model, unit: product.unit,
     unitPriceDecimal: normalizeUnitPrice(line.unitPriceDecimal), taxRate: 13,
-    quantity: line.quantity, amountCent, taxCent: 0, totalCent: amountCent,
+    quantity: line.quantity, amountCent, taxCent: calcTaxCent(amountCent), totalCent: calcTotalCent(amountCent, calcTaxCent(amountCent)),
     stockBefore, stockAfter,
   }).run();
 
   appendLedger({
-    priceVersionId: line.priceVersionId, changeQuantity: -line.quantity, balanceBefore: stockBefore,
+    productId: line.productId, changeQuantity: -line.quantity, balanceBefore: stockBefore,
     sourceType: 'outbound', sourceId: batchId, reason: `销项开票 ${batchNo}`,
   });
 
-  db.update(priceVersions)
+  db.update(products)
     .set({ stockBalance: stockAfter, updatedAt: exportedAt })
-    .where(eq(priceVersions.id, line.priceVersionId)).run();
+    .where(eq(products.id, line.productId)).run();
 }
 
 /** 优先使用用户编辑后的最终金额，否则按统一系数计算。 */

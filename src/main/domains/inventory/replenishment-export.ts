@@ -76,7 +76,7 @@ function calculateTotals(lines: ReplenishmentPreviewLine[]): {
 /** 插入导出明细行 */
 function insertExportLine(db: ReturnType<typeof getDb>, exportId: string, line: ReplenishmentPreviewLine): void {
   db.insert(replenishmentExportLines).values({
-    id: uuidv7(), exportId, priceVersionId: line.priceVersionId,
+    id: uuidv7(), exportId, productId: line.productId,
     name: line.name, model: line.model, unit: line.unit,
     unitPriceDecimal: line.unitPriceDecimal, stockBalanceSnapshot: line.stockBalanceSnapshot,
     replenishmentQuantity: line.replenishmentQuantity, amountCent: line.amountCent,

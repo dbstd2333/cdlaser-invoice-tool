@@ -2,20 +2,18 @@ import { dialog, type WebContents } from 'electron';
 import { registerHandler } from '../security/ipc-security';
 import { IPC_CHANNELS } from '@shared/contracts/channels';
 import {
-  priceVersionQuerySchema,
+  productQuerySchema,
   productUpsertSchema,
-  priceVersionCreateSchema,
   fieldHistoryQuerySchema,
+  stockSummarySchema,
 } from '@shared/schemas/index';
 import {
-  listPriceVersions,
+  listProducts,
   getProductById,
   createProduct,
   updateProduct,
   deleteProduct,
-  createPriceVersion,
-  getPriceVersionsByIds,
-  getPriceVersionsByProduct,
+  getProductsByIds,
 } from '../domains/catalog/catalog-service';
 import {
   buildInitialImportPreview,
@@ -28,13 +26,14 @@ import { parseCatalogExcel } from '../excel/importers/parsers';
 import { generateCatalogTemplate } from '../excel/importers/template-generator';
 import { queryFieldHistory } from '../domains/audit/audit-service';
 import { getInitStatus } from '../domains/audit/settings-service';
+import { getStockSummary } from '../domains/catalog/catalog-query';
 
 /**
- * 商品与价格版本 IPC 处理器。
+ * 商品 IPC 处理器。
  */
 export function registerCatalogIpc(): void {
-  registerHandler(IPC_CHANNELS.catalog.listPriceVersions, priceVersionQuerySchema, (input) => {
-    return listPriceVersions(input);
+  registerHandler(IPC_CHANNELS.catalog.listProducts, productQuerySchema, (input) => {
+    return listProducts(input);
   });
 
   registerHandler(IPC_CHANNELS.catalog.getProductById, null, (id: string) => {
@@ -47,10 +46,6 @@ export function registerCatalogIpc(): void {
 
   registerHandler(IPC_CHANNELS.catalog.updateProduct, productUpsertSchema, (input) => {
     return updateProduct(input);
-  });
-
-  registerHandler(IPC_CHANNELS.catalog.createPriceVersion, priceVersionCreateSchema, (input) => {
-    return createPriceVersion(input);
   });
 
   registerHandler(IPC_CHANNELS.catalog.deleteProduct, null, (id: string) => {
@@ -113,13 +108,13 @@ export function registerCatalogIpc(): void {
     return queryFieldHistory(input.entityType, input.entityId, input.page, input.pageSize);
   });
 
-  // 批量获取价格版本详情（开票 Modal 前校验）
-  registerHandler('catalog.getPriceVersionsByIds', null, (ids: string[]) => {
-    return getPriceVersionsByIds(ids);
+  registerHandler(IPC_CHANNELS.catalog.stockSummary, stockSummarySchema, () => {
+    return getStockSummary();
   });
 
-  registerHandler(IPC_CHANNELS.catalog.getPriceVersionsByProduct, null, (id: string) => {
-    return getPriceVersionsByProduct(id);
+  // 批量获取商品详情（开票 Modal 前校验）
+  registerHandler('catalog.getProductsByIds', null, (ids: string[]) => {
+    return getProductsByIds(ids);
   });
 
   // 下载商品模板

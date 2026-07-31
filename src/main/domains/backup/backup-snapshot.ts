@@ -35,7 +35,7 @@ export function createBackupPayload(backupType: 'auto' | 'manual', password: str
 
   const manifest: BackupPayload['manifest'] = {
     appVersion: app.getVersion(),
-    schemaVersion: '1.0',
+    schemaVersion: '2.0',
     recordCounts: collectRecordCounts(raw),
     dbSha256,
     createdAt: new Date().toISOString(),
@@ -56,7 +56,7 @@ export function createBackupPayload(backupType: 'auto' | 'manual', password: str
 
 /** 收集各表记录数 */
 function collectRecordCounts(raw: ReturnType<typeof getRawDb>): Record<string, number> {
-  const tables = ['customers', 'products', 'price_versions', 'outbound_batches', 'outbound_lines',
+  const tables = ['customers', 'products', 'outbound_batches', 'outbound_lines',
     'inbound_batches', 'inbound_lines', 'inventory_ledger', 'audit_events'];
   const counts: Record<string, number> = {};
   for (const table of tables) {

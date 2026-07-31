@@ -21,7 +21,7 @@ export function registerReplenishmentIpc(): void {
   });
 
   // 执行导出
-  registerHandler(IPC_CHANNELS.replenishment.export, null, async (_input: null, sender: WebContents) => {
+  registerHandler(IPC_CHANNELS.replenishment.export, null, async (_input: null, _sender: WebContents) => {
     const result = await executeReplenishmentExport();
     if (!result) {
       return { exported: false, reason: '当前无需向总部补票' };
@@ -56,7 +56,7 @@ export function registerReplenishmentIpc(): void {
     return getReplenishmentDetail(id);
   });
 
-  registerHandler(IPC_CHANNELS.replenishment.download, null, async (id: string, sender: WebContents) => {
+  registerHandler(IPC_CHANNELS.replenishment.download, null, async (id: string, _sender: WebContents) => {
     const xlsxData = getReplenishmentXlsx(id);
     if (!xlsxData) throw new Error('导出记录不存在');
     const saveResult = await dialog.showSaveDialog({

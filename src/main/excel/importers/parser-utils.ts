@@ -1,9 +1,17 @@
-import XlsxPopulate from 'xlsx-populate';
+import * as XLSX from 'xlsx';
+import * as fs from 'node:fs';
 import { isOverPrecisionNumeric, trimInvisible } from '@shared/contracts/normalize';
 
+// SheetJS ESM 构建（vitest 等 ESM 环境）不会自动加载 fs，需显式注入；
+// CJS 构建（生产环境）中此调用无害。
+XLSX.set_fs(fs);
+
 /**
- * Excel 解析共享工具（基于 xlsx-populate，纯 JS、对 Node 32 友好）。
- * 读取层用轻量适配器包装 xlsx-populate，使上层 parser 无需感知底层库差异。
+ * Excel 解析共享工具（基于 SheetJS 社区版）。
+ * 读取层用轻量适配器包装 SheetJS，使上层 parser 无需感知底层库差异。
+ *
+ * 说明：SheetJS 社区版读取时可正确区分文本/数值/日期/布尔类型，
+ * 足以支撑导入解析与超精度数值识别。
  */
 
 export type CellValue = string | number | boolean | Date | null;
@@ -67,13 +75,18 @@ class XpRow implements ReadRow {
 class XpSheet implements ReadSheet {
   private readonly matrix: CellValue[][];
 
-  constructor(private readonly sheet: import('xlsx-populate').Sheet) {
-    const used = this.sheet.usedRange ? this.sheet.usedRange() : null;
-    this.matrix = used ? (used.value() as CellValue[][]) : [];
-  }
-
-  get name(): string {
-    return this.sheet.name();
+  constructor(
+    public readonly name: string,
+    ws: XLSX.WorkSheet,
+  ) {
+    // 将工作表转为二维数组：文本保留为字符串、数值为 number、日期为 Date。
+    this.matrix =
+      (XLSX.utils.sheet_to_json(ws, {
+        header: 1,
+        blankrows: true,
+        defval: null,
+        raw: true,
+      }) as CellValue[][]) ?? [];
   }
 
   get rowCount(): number {
@@ -88,8 +101,10 @@ class XpSheet implements ReadSheet {
 
 /** 读取工作簿 */
 export async function readWorkbook(filePath: string): Promise<ReadWorkbook> {
-  const workbook = await XlsxPopulate.fromFileAsync(filePath);
-  return { worksheets: workbook.sheets().map((s) => new XpSheet(s)) };
+  const workbook = XLSX.readFile(filePath, { cellDates: true });
+  return {
+    worksheets: workbook.SheetNames.map((name) => new XpSheet(name, workbook.Sheets[name])),
+  };
 }
 
 /** 将单元格值转为文本，避免数字精度丢失 */
@@ -102,10 +117,11 @@ export function cellToText(cell: ReadCell | undefined): string {
   if (val instanceof Date) return val.toISOString().split('T')[0];
   if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
   if (typeof val === 'object') {
-    if ('richText' in val) {
-      return (val as { richText: { text: string }[] }).richText.map((r) => r.text).join('');
+    const obj = val as Record<string, unknown>;
+    if ('text' in obj && typeof obj.text === 'string') return obj.text;
+    if ('richText' in obj && Array.isArray(obj.richText)) {
+      return (obj.richText as { text: string }[]).map((r) => r.text).join('');
     }
-    if ('text' in val) return String((val as { text: string }).text);
   }
   return String(val);
 }

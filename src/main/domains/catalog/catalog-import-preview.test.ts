@@ -43,12 +43,8 @@ beforeAll(() => {
   db.exec(`
     CREATE TABLE products (
       id TEXT PRIMARY KEY, name TEXT, name_normalized TEXT, model TEXT, model_normalized TEXT,
-      unit TEXT, tax_classification_code TEXT, data_status TEXT, status TEXT, remark TEXT,
-      created_at TEXT, updated_at TEXT
-    );
-    CREATE TABLE price_versions (
-      id TEXT PRIMARY KEY, product_id TEXT, unit_price_decimal TEXT, tax_rate INTEGER,
-      stock_balance INTEGER, status TEXT, created_at TEXT, updated_at TEXT
+      unit TEXT, tax_classification_code TEXT, unit_price_decimal TEXT, tax_rate INTEGER,
+      stock_balance INTEGER, data_status TEXT, status TEXT, remark TEXT, created_at TEXT, updated_at TEXT
     );
   `);
   dbRef.current = db;
@@ -59,7 +55,7 @@ afterAll(() => {
 });
 
 beforeEach(() => {
-  dbRef.current!.exec('DELETE FROM price_versions; DELETE FROM products;');
+  dbRef.current!.exec('DELETE FROM products;');
 });
 
 describe('商品导入预览 - 自动去重与单价精度', () => {
@@ -84,14 +80,14 @@ describe('商品导入预览 - 自动去重与单价精度', () => {
     expect(preview.dedupedRowCount).toBe(2);
     expect(preview.hasErrors).toBe(false);
     expect(preview.errorCount).toBe(0);
-    // 仅首行有效：新增 1 商品、1 价格版本
+    // 仅首行有效：新增 1 个商品。
     expect(preview.newProductCount).toBe(1);
-    expect(preview.newPriceVersionCount).toBe(1);
+    expect(preview.updatedProductCount).toBe(0);
     // 首行正常，后续行标记去重
     expect(preview.rows[0].deduped).toBe(false);
     expect(preview.rows[1].deduped).toBe(true);
     expect(preview.rows[2].deduped).toBe(true);
-    expect(preview.rows[1].errors[0]).toContain('与第 2 行重复');
+    expect(preview.rows[1].errors[0]).toContain('与第 2 行商品重复');
   });
 
   it('单价超过 13 位小数自动四舍五入，并按舍入后值去重', () => {
@@ -113,17 +109,17 @@ describe('商品导入预览 - 自动去重与单价精度', () => {
 
     expect(preview.dedupedRowCount).toBe(0);
     expect(preview.newProductCount).toBe(2);
-    expect(preview.newPriceVersionCount).toBe(2);
+    expect(preview.updatedProductCount).toBe(0);
   });
 
-  it('不同单价不去重', () => {
+  it('同一商品不同单价仍只保留一个当前价', () => {
     const preview = buildInitialImportPreview([
       { ...baseRow, rowIndex: 2, unitPriceDecimal: '188.00' },
       { ...baseRow, rowIndex: 3, unitPriceDecimal: '199.00' },
     ]);
 
-    expect(preview.dedupedRowCount).toBe(0);
-    expect(preview.newPriceVersionCount).toBe(2);
+    expect(preview.dedupedRowCount).toBe(1);
+    expect(preview.newProductCount).toBe(1);
   });
 
   it('日常导入同样自动去重', () => {

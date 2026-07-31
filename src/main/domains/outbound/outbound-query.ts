@@ -1,6 +1,7 @@
 import { getRawDb } from '../../db/connection';
 import { outboundBatches, outboundLines } from '../../db/schema/index';
 import { toCamel, toCamelList } from '../../db/case-mapper';
+import { calcTaxCent } from '@shared/money';
 import type { OutboundBatch, OutboundLine, PageResponse } from '@shared/contracts/types';
 import type { OutboundQueryInput } from '@shared/schemas/index';
 
@@ -23,7 +24,7 @@ export function mapOutboundBatch(row: typeof outboundBatches.$inferSelect): Outb
 /** 将明细行映射为业务实体 */
 function mapOutboundLine(row: typeof outboundLines.$inferSelect): OutboundLine {
   return {
-    id: row.id, batchId: row.batchId, priceVersionId: row.priceVersionId,
+    id: row.id, batchId: row.batchId, productId: row.productId,
     name: row.name, taxClassificationCode: row.taxClassificationCode,
     model: row.model, unit: row.unit, unitPriceDecimal: row.unitPriceDecimal,
     taxRate: row.taxRate, quantity: row.quantity, amountCent: row.amountCent,
@@ -46,6 +47,26 @@ export function listOutboundBatches(input: OutboundQueryInput): PageResponse<Out
   );
 
   return { rows: rows.map(mapOutboundBatch), total: countRow.cnt, page: input.page, pageSize: input.pageSize };
+}
+
+/**
+ * 本月有效票税额合计（分）。
+ * 算法：对每张 status='valid' 且 exported_at 在本月内的开票记录，
+ * 取金额（totalAmountCent）× 0.13（calcTaxCent），逐张求和。
+ */
+export function getMonthlyTaxCent(): number {
+  const raw = getRawDb();
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString();
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+
+  const rows = raw
+    .prepare(
+      `SELECT total_amount_cent FROM outbound_batches WHERE status = 'valid' AND exported_at >= ? AND exported_at <= ?`,
+    )
+    .all(start, end) as { total_amount_cent: number }[];
+
+  return rows.reduce((sum, r) => sum + calcTaxCent(r.total_amount_cent), 0);
 }
 
 /** 构建查询条件 */

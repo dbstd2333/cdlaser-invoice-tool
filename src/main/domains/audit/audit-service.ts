@@ -1,7 +1,6 @@
 import { v7 as uuidv7 } from 'uuid';
 import { getDb, getRawDb } from '../../db/connection';
 import { auditEvents, auditFieldChanges } from '../../db/schema/index';
-import { eq } from 'drizzle-orm';
 import type { FieldHistoryEntry } from '@shared/contracts/types';
 import { fieldHistoryQuerySchema } from '@shared/schemas/index';
 
@@ -78,7 +77,6 @@ export function queryFieldHistory(
   pageSize: number,
 ): { rows: FieldHistoryEntry[]; total: number } {
   const parsed = fieldHistoryQuerySchema.parse({ entityType, entityId, page, pageSize });
-  const db = getDb();
   const raw = getRawDb();
 
   const countRow = raw.prepare(`

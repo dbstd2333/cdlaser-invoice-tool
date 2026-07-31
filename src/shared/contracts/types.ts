@@ -4,7 +4,7 @@ export type { EntityId, IsoTimestamp, StockStatus, PageRequest, PageResponse, In
 export { getStockStatus, getStockStatusText } from './types/common';
 
 export type { CustomerStatus, Customer, CustomerSnapshot } from './types/customer';
-export type { ProductDataStatus, ProductStatus, PriceVersionStatus, Product, PriceVersion, PriceVersionRow } from './types/catalog';
+export type { ProductDataStatus, ProductStatus, Product } from './types/catalog';
 export type { OutboundBatchStatus, OutboundBatch, OutboundLine } from './types/outbound';
 export type { InboundBatchStatus, InboundBatch, InboundLine } from './types/inbound';
 export type { LedgerSourceType, InventoryLedger, ReplenishmentExport, ReplenishmentExportLine } from './types/inventory';

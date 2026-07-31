@@ -4,8 +4,6 @@ import { resolve } from 'node:path';
 import { app } from 'electron';
 import { escapeXml } from '@shared/contracts/normalize';
 import { createHash } from 'node:crypto';
-import { TAX_RATE_DECIMAL } from '@shared/money/index';
-import log from 'electron-log/main';
 
 /**
  * 税务模板 OOXML 定点修改器。

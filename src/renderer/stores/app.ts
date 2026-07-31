@@ -1,50 +1,70 @@
-import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
-import { api } from '../api';
-import type { InitStatus } from '@shared/contracts/types';
+import { create } from 'zustand';
+import { api } from '@renderer/api';
 
-/**
- * 应用全局 Store - 管理初始化状态、侧栏折叠和设置抽屉。
- */
+export const THEME_KEY = 'cdlaser-theme-mode';
 
-export const useAppStore = defineStore('app', () => {
-  const initStatus = ref<InitStatus>({
-    customerInitialImportDone: false,
-    productInitialImportDone: false,
-    templateVersion: null,
-  });
+export type ThemeMode = 'light' | 'dark';
 
-  const sidebarCollapsed = ref(false);
-  const settingsDrawerVisible = ref(false);
-  const loading = ref(false);
+export interface AppState {
+  themeMode: ThemeMode;
+  appVersion: string;
+  schemaVersion: number;
+  productImportDone: boolean;
+  isCssReady: boolean;
+  toggleTheme: () => Promise<void>;
+  setTheme: (mode: ThemeMode) => Promise<void>;
+  loadSystemInfo: () => Promise<void>;
+  setCssReady: (ready: boolean) => void;
+}
 
-  const customerImportDone = computed(() => initStatus.value.customerInitialImportDone);
-  const productImportDone = computed(() => initStatus.value.productInitialImportDone);
-
-  /** 加载初始化状态 */
-  async function loadInitStatus(): Promise<void> {
-    initStatus.value = await api.system.getInitStatus();
+function readInitialTheme(): ThemeMode {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === 'light' || saved === 'dark') return saved;
+  } catch {
+    /* ignore */
   }
+  return 'light';
+}
 
-  /** 切换侧栏折叠 */
-  function toggleSidebar(): void {
-    sidebarCollapsed.value = !sidebarCollapsed.value;
-  }
+function applyThemeClass(mode: ThemeMode): void {
+  const root = document.documentElement;
+  if (mode === 'dark') root.classList.add('dark');
+  else root.classList.remove('dark');
+}
 
-  /** 打开/关闭设置抽屉 */
-  function toggleSettingsDrawer(visible?: boolean): void {
-    settingsDrawerVisible.value = visible ?? !settingsDrawerVisible.value;
-  }
+export const useAppStore = create<AppState>((set, get) => ({
+  themeMode: readInitialTheme(),
+  appVersion: '1.0.0',
+  schemaVersion: 1,
+  productImportDone: false,
+  isCssReady: false,
 
-  return {
-    initStatus,
-    sidebarCollapsed,
-    settingsDrawerVisible,
-    loading,
-    customerImportDone,
-    productImportDone,
-    loadInitStatus,
-    toggleSidebar,
-    toggleSettingsDrawer,
-  };
-});
+  async toggleTheme() {
+    const next: ThemeMode = get().themeMode === 'light' ? 'dark' : 'light';
+    await get().setTheme(next);
+  },
+
+  async setTheme(mode) {
+    try {
+      localStorage.setItem(THEME_KEY, mode);
+    } catch {
+      /* ignore */
+    }
+    applyThemeClass(mode);
+    set({ themeMode: mode });
+  },
+
+  async loadSystemInfo() {
+    try {
+      const info = await api.system.getVersion();
+      set({ appVersion: info.version });
+    } catch {
+      /* ignore */
+    }
+  },
+
+  setCssReady(ready) {
+    set({ isCssReady: ready });
+  },
+}));

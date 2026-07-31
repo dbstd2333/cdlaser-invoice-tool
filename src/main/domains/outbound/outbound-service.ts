@@ -13,5 +13,5 @@ export type { DraftValidationResult, OutboundExportResult } from './outbound-typ
 
 export { validateDraft } from './outbound-validate';
 export { executeOutboundExport } from './outbound-export';
-export { listOutboundBatches, getOutboundDetail, getOutboundXlsx, mapOutboundBatch } from './outbound-query';
+export { listOutboundBatches, getOutboundDetail, getOutboundXlsx, mapOutboundBatch, getMonthlyTaxCent } from './outbound-query';
 export { voidOutboundBatch } from './outbound-void';

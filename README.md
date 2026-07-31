@@ -1,6 +1,6 @@
 # 成都莱盛发票库存管理工具
 
-面向 Windows 的单机 Electron 桌面应用，管理客户、商品价格版本、开票记录和可正可负的发票库存。
+面向 Windows 的单机 Electron 桌面应用，管理客户、商品唯一含税单价、开票记录和可正可负的发票库存。
 
 ## 技术栈
 
@@ -8,8 +8,8 @@
 | --- | --- |
 | 桌面容器 | Electron + TypeScript |
 | 构建打包 | Vite + electron-builder |
-| 渲染层 | Vue 3 + Vue Router + Pinia |
-| UI | Element Plus |
+| 渲染层 | React 19 + React Router + Zustand |
+| UI | Ant Design 6 |
 | 本地数据库 | SQLite + better-sqlite3 |
 | 数据访问 | Drizzle ORM |
 | 校验 | Zod |
@@ -23,7 +23,7 @@
 
 - **主进程**：管理 BrowserWindow、SQLite、迁移、文件系统、Excel、腾讯云 COS 和系统对话框，承载所有领域服务和事务。
 - **预加载进程**：通过 `contextBridge` 暴露按业务划分的最小 API，不暴露 `ipcRenderer` 或 Node.js 对象。
-- **渲染进程**：只负责 Vue 界面和临时表单状态，不直接读写 SQLite、COS、Excel 或本机文件。
+- **渲染进程**：只负责 React 界面和临时表单状态，不直接读写 SQLite、COS、Excel 或本机文件。
 
 ### 安全基线
 
@@ -35,7 +35,7 @@
 ## 业务功能
 
 1. **客户管理**（页面一）：客户 CRUD、首次批量导入、字段历史
-2. **商品、库存与开票**（页面二）：商品价格版本管理、跨分页勾选、销项开票、商品导入、月底负库存导出、月初进项导入、库存调整、库存流水
+2. **商品、库存与开票**（页面二）：商品及唯一含税单价管理、跨分页选择、销项开票、商品导入、月底负库存导出、月初进项导入、库存调整、库存流水
 3. **开票记录**（页面三）：开票批次查询、明细查看（含扣减前后库存快照）、重新下载、作废恢复
 4. **腾讯云 COS 云备份**（设置抽屉）：配置、测试、立即备份、历史列表、安全恢复
 
@@ -93,7 +93,7 @@ src/
   renderer/          # 渲染进程
     layouts/         # 应用壳布局
     pages/           # 三个一级页面
-    stores/          # Pinia 状态
+    stores/          # Zustand 状态
     api/             # API 封装
   shared/            # 共享层
     contracts/       # 领域类型和规范化工具

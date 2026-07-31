@@ -29,7 +29,7 @@ export interface InboundLine {
   invoiceDate: string | null;
   invoiceNo: string | null;
   sellerName: string | null;
-  priceVersionId: EntityId;
+  productId: EntityId;
   name: string;
   model: string;
   unit: string;

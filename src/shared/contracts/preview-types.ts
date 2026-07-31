@@ -2,8 +2,6 @@ import type {
   Customer,
   PageResponse,
   FieldHistoryEntry,
-  PriceVersion,
-  PriceVersionRow,
   Product,
   OutboundBatch,
   OutboundLine,
@@ -60,7 +58,7 @@ export interface CatalogImportRow {
 export interface CatalogImportPreviewResult {
   rows: CatalogImportRow[];
   newProductCount: number;
-  newPriceVersionCount: number;
+  updatedProductCount: number;
   totalStockSum: number;
   errorCount: number;
   /** 文件内自动去重的行数（相同商品+型号+单价） */
@@ -72,7 +70,7 @@ export interface CatalogImportPreviewResult {
 
 export interface DraftValidationResult {
   validLines: Array<{
-    priceVersionId: string;
+    productId: string;
     name: string;
     model: string;
     unit: string;
@@ -82,12 +80,12 @@ export interface DraftValidationResult {
     quantity: number;
     amountCent?: number;
   }>;
-  invalidPriceVersionIds: string[];
+  invalidProductIds: string[];
   errors: string[];
 }
 
 export interface ReplenishmentPreviewLine {
-  priceVersionId: string;
+  productId: string;
   name: string;
   model: string;
   unit: string;
@@ -115,8 +113,7 @@ export interface InboundPreviewLine {
   totalCent: number;
   isNewProduct: boolean;
   productId: string | null;
-  priceVersionId: string | null;
-  isNewPriceVersion: boolean;
+  priceChanged: boolean;
   matched: boolean;
   errors: string[];
 }
@@ -140,7 +137,7 @@ export interface InboundPreviewResult {
   totalTaxCent: number;
   totalCent: number;
   newProductCount: number;
-  newPriceVersionCount: number;
+  updatedProductCount: number;
 }
 
 export interface BackupStatus {
@@ -178,8 +175,6 @@ export type {
   Customer,
   PageResponse,
   FieldHistoryEntry,
-  PriceVersion,
-  PriceVersionRow,
   Product,
   OutboundBatch,
   OutboundLine,

@@ -1,55 +1,50 @@
-import XlsxPopulate from 'xlsx-populate';
+import * as XLSX from 'xlsx';
+import * as fs from 'node:fs';
 import { resolve } from 'node:path';
-import { mkdirSync, existsSync } from 'node:fs';
+
+// SheetJS ESM 构建不会自动加载 fs，需显式注入；CJS 构建中此调用无害。
+XLSX.set_fs(fs);
 
 /**
  * 生成税务模板占位文件。
  * 实际项目中应使用官方「发票开具项目信息导入模板.xlsx」替换此文件。
  * 此脚本生成结构兼容的占位模板用于开发测试。
+ *
+ * 注意：基于 SheetJS 社区版，不写入单元格样式（加粗、字号、填充、隐藏工作表）。
  */
 async function generateTemplate(): Promise<void> {
   const dir = resolve(process.cwd(), 'resources/templates');
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
   const filePath = resolve(dir, '发票开具项目信息导入模板.xlsx');
 
-  const wb = await XlsxPopulate.fromBlankAsync();
-  const detailSheet = wb.addSheet('1-明细模板');
-  wb.deleteSheet('Sheet1');
-
-  // 第 1 行：标题
-  detailSheet.cell('A1').value('发票开具项目信息导入模板');
-  detailSheet.cell('A1').style('bold', true);
-  detailSheet.cell('A1').style('fontSize', 14);
-  // 第 2 行：版本信息
-  detailSheet.cell('A2').value('excelVersion: 1.0');
-  // 第 3 行：表头
-  const headers = ['项目名称', '税收分类编码', '规格型号', '单位', '数量', '单价', '金额', '税率'];
+  const detailHeaders = ['项目名称', '税收分类编码', '规格型号', '单位', '数量', '单价', '金额', '税率'];
   const colWidths = [30, 20, 20, 10, 12, 15, 15, 10];
-  headers.forEach((h, i) => {
-    const col = i + 1;
-    detailSheet.column(col).width(colWidths[i]);
-    const cell = detailSheet.cell(3, col);
-    cell.value(h);
-    cell.style('bold', true);
-    cell.style('fill', 'E0E0E0');
-  });
+
+  // 第 1 行标题、第 2 行版本、第 3 行表头
+  const detailWs = XLSX.utils.aoa_to_sheet([
+    ['发票开具项目信息导入模板'],
+    ['excelVersion: 1.0'],
+    detailHeaders,
+  ]);
+  detailWs['!cols'] = colWidths.map((w) => ({ wch: w }));
 
   // 其他 3 个工作表（隐藏数据/版本信息/说明）
-  const hiddenSheet = wb.addSheet('隐藏数据');
-  hiddenSheet.cell('A1').value('hidden config data');
-  hiddenSheet.hidden(true);
+  const hiddenWs = XLSX.utils.aoa_to_sheet([['hidden config data']]);
+  const versionWs = XLSX.utils.aoa_to_sheet([['excelVersion', '1.0']]);
+  const instructionWs = XLSX.utils.aoa_to_sheet([
+    ['从第 4 行开始写入明细数据'],
+    ['税率固定为 0.13'],
+  ]);
 
-  const versionSheet = wb.addSheet('版本信息');
-  versionSheet.cell('A1').value('excelVersion');
-  versionSheet.cell('B1').value('1.0');
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, detailWs, '1-明细模板');
+  XLSX.utils.book_append_sheet(wb, hiddenWs, '隐藏数据');
+  XLSX.utils.book_append_sheet(wb, versionWs, '版本信息');
+  XLSX.utils.book_append_sheet(wb, instructionWs, '说明');
 
-  const instructionSheet = wb.addSheet('说明');
-  instructionSheet.cell('A1').value('从第 4 行开始写入明细数据');
-  instructionSheet.cell('A2').value('税率固定为 0.13');
-
-  await wb.toFileAsync(filePath);
+  XLSX.writeFile(wb, filePath);
   console.log(`税务模板已生成: ${filePath}`);
 }
 

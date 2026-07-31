@@ -8,7 +8,7 @@ export type LedgerSourceType =
 
 export interface InventoryLedger {
   id: EntityId;
-  priceVersionId: EntityId;
+  productId: EntityId;
   changeQuantity: number;
   balanceBefore: number;
   balanceAfter: number;
@@ -33,7 +33,7 @@ export interface ReplenishmentExport {
 export interface ReplenishmentExportLine {
   id: EntityId;
   exportId: EntityId;
-  priceVersionId: EntityId;
+  productId: EntityId;
   name: string;
   model: string;
   unit: string;

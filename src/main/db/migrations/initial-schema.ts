@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { migrateLegacyPriceVersions } from './legacy-price-version';
 
 /**
  * 数据库建表迁移 SQL。
@@ -8,6 +9,7 @@ import type Database from 'better-sqlite3';
 
 /** 执行建表 SQL */
 export function runMigrations(db: Database.Database): void {
+  migrateLegacyPriceVersions(db);
   db.exec(MIGRATION_SQL);
 }
 
@@ -41,6 +43,9 @@ const MIGRATION_SQL = `
     model_normalized TEXT NOT NULL,
     unit TEXT NOT NULL,
     tax_classification_code TEXT NOT NULL,
+    unit_price_decimal TEXT NOT NULL,
+    tax_rate INTEGER NOT NULL DEFAULT 13,
+    stock_balance INTEGER NOT NULL DEFAULT 0,
     data_status TEXT NOT NULL DEFAULT 'complete',
     status TEXT NOT NULL DEFAULT 'active',
     remark TEXT,
@@ -48,21 +53,8 @@ const MIGRATION_SQL = `
     updated_at TEXT NOT NULL
   );
   CREATE UNIQUE INDEX IF NOT EXISTS products_name_model_unique ON products(name_normalized, model_normalized);
-
-  CREATE TABLE IF NOT EXISTS price_versions (
-    id TEXT PRIMARY KEY NOT NULL,
-    product_id TEXT NOT NULL REFERENCES products(id),
-    unit_price_decimal TEXT NOT NULL,
-    tax_rate INTEGER NOT NULL DEFAULT 13,
-    stock_balance INTEGER NOT NULL DEFAULT 0,
-    status TEXT NOT NULL DEFAULT 'active',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
-  CREATE UNIQUE INDEX IF NOT EXISTS price_versions_product_price_unique ON price_versions(product_id, unit_price_decimal);
-  CREATE INDEX IF NOT EXISTS price_versions_product_idx ON price_versions(product_id);
-  CREATE INDEX IF NOT EXISTS price_versions_status_idx ON price_versions(status);
-  CREATE INDEX IF NOT EXISTS price_versions_stock_idx ON price_versions(stock_balance);
+  CREATE INDEX IF NOT EXISTS products_status_idx ON products(status);
+  CREATE INDEX IF NOT EXISTS products_stock_idx ON products(stock_balance);
 
   CREATE TABLE IF NOT EXISTS outbound_batches (
     id TEXT PRIMARY KEY NOT NULL,
@@ -88,7 +80,7 @@ const MIGRATION_SQL = `
   CREATE TABLE IF NOT EXISTS outbound_lines (
     id TEXT PRIMARY KEY NOT NULL,
     batch_id TEXT NOT NULL REFERENCES outbound_batches(id),
-    price_version_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
     name TEXT NOT NULL,
     tax_classification_code TEXT NOT NULL,
     model TEXT NOT NULL,
@@ -103,7 +95,7 @@ const MIGRATION_SQL = `
     stock_after INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS outbound_lines_batch_idx ON outbound_lines(batch_id);
-  CREATE INDEX IF NOT EXISTS outbound_lines_price_version_idx ON outbound_lines(price_version_id);
+  CREATE INDEX IF NOT EXISTS outbound_lines_product_idx ON outbound_lines(product_id);
 
   CREATE TABLE IF NOT EXISTS inbound_batches (
     id TEXT PRIMARY KEY NOT NULL,
@@ -132,7 +124,7 @@ const MIGRATION_SQL = `
     invoice_date TEXT,
     invoice_no TEXT,
     seller_name TEXT,
-    price_version_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
     name TEXT NOT NULL,
     model TEXT NOT NULL,
     unit TEXT NOT NULL,
@@ -143,7 +135,7 @@ const MIGRATION_SQL = `
     total_cent INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS inbound_lines_batch_idx ON inbound_lines(batch_id);
-  CREATE INDEX IF NOT EXISTS inbound_lines_price_version_idx ON inbound_lines(price_version_id);
+  CREATE INDEX IF NOT EXISTS inbound_lines_product_idx ON inbound_lines(product_id);
 
   CREATE TABLE IF NOT EXISTS replenishment_exports (
     id TEXT PRIMARY KEY NOT NULL,
@@ -163,7 +155,7 @@ const MIGRATION_SQL = `
   CREATE TABLE IF NOT EXISTS replenishment_export_lines (
     id TEXT PRIMARY KEY NOT NULL,
     export_id TEXT NOT NULL REFERENCES replenishment_exports(id),
-    price_version_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
     name TEXT NOT NULL,
     model TEXT NOT NULL,
     unit TEXT NOT NULL,
@@ -192,7 +184,7 @@ const MIGRATION_SQL = `
 
   CREATE TABLE IF NOT EXISTS inventory_ledger (
     id TEXT PRIMARY KEY NOT NULL,
-    price_version_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
     change_quantity INTEGER NOT NULL,
     balance_before INTEGER NOT NULL,
     balance_after INTEGER NOT NULL,
@@ -201,7 +193,7 @@ const MIGRATION_SQL = `
     reason TEXT,
     created_at TEXT NOT NULL
   );
-  CREATE INDEX IF NOT EXISTS inventory_ledger_price_version_idx ON inventory_ledger(price_version_id, created_at);
+  CREATE INDEX IF NOT EXISTS inventory_ledger_product_idx ON inventory_ledger(product_id, created_at);
   CREATE INDEX IF NOT EXISTS inventory_ledger_source_idx ON inventory_ledger(source_type, source_id);
 
   CREATE TABLE IF NOT EXISTS audit_events (

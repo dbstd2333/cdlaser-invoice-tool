@@ -24,7 +24,7 @@ export interface OutboundBatch {
 export interface OutboundLine {
   id: EntityId;
   batchId: EntityId;
-  priceVersionId: EntityId;
+  productId: EntityId;
   name: string;
   taxClassificationCode: string;
   model: string;

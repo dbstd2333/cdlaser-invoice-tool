@@ -105,10 +105,9 @@ ElContainer
 - `InventoryToolbar` 承载搜索、筛选、刷新、列设置和业务操作入口。
 - `InventoryTable` 使用服务端分页、固定表头、固定多选列和固定右侧操作列。
 - 默认 `pageSize = 50`，可选 20、50、100；每次进入页面二恢复默认页码和每页数量。
-- `ElTable` 使用 `row-key="priceVersionId"`，`type="selection"` 列启用 `reserve-selection`。
-- 页面级 `selectedPriceVersions` Store 以 `priceVersionId` 为键保存跨页选择；翻页、改变每页数量和改变筛选条件只更新当前页数据，不清空 Store。
+- 表格使用 `row-key="id"`，页面级选择 Store 以 `productId` 为键保存跨页选择；翻页、改变每页数量和改变筛选条件只更新当前页数据，不清空 Store。
 - 工具栏展示全局已选数量，并提供查看已选和清空操作；离开 `/inventory` 或开票成功后清空，取消开票 Dialog 时保留。
-- 打开开票 Dialog 前，主进程按全部已选 ID 批量重新读取并校验启用、资料完整度和价格版本状态；失效项从 Store 移除并返回明确提示。
+- 打开开票 Dialog 前，主进程按全部已选商品 ID 批量重新读取并校验启用状态、资料完整度和当前含税单价；失效项从 Store 移除并返回明确提示。
 - 表格高度由主内容区 Flex 布局分配，通过 `max-height` 保持表头固定，禁止在窗口 resize 时散落手工高度计算。
 - 库存正、零、负状态使用统一 Tag 和语义色，不以整行高饱和底色影响可读性。
 - URL 只保存必要的筛选和分页状态，不为 Modal 创建子路由。
@@ -264,20 +263,13 @@ src/
 - `model`、`model_normalized`
 - `unit`
 - `tax_classification_code`
+- `unit_price_decimal`
+- `tax_rate`
+- `stock_balance`
 - `data_status`: complete/incomplete
 - `status`: active/inactive
 - `remark`
 - 唯一索引：`name_normalized + model_normalized`
-
-**price_versions**
-
-- `id`
-- `product_id`
-- `unit_price_decimal`
-- `tax_rate`
-- `stock_balance`
-- `status`
-- 唯一索引：`product_id + unit_price_decimal`
 
 ### 6.2 销项
 
@@ -295,7 +287,7 @@ src/
 **outbound_lines**
 
 - `id`、`batch_id`
-- `price_version_id`
+- `product_id`
 - 商品、编码、型号、单位、单价和税率快照
 - `quantity`
 - `amount_cent`、`tax_cent`、`total_cent`
@@ -317,7 +309,7 @@ src/
 
 - `id`、`batch_id`
 - 原工作表、行号、发票日期、发票号、销售方
-- `price_version_id`
+- `product_id`
 - 商品、型号、单位和价格快照
 - `quantity`、金额字段
 
@@ -329,8 +321,8 @@ src/
 
 **replenishment_export_lines**
 
-- `export_id`、`price_version_id`
-- 商品和价格版本快照
+- `export_id`、`product_id`
+- 商品和单价快照
 - `stock_balance_snapshot`
 - `replenishment_quantity`，等于负库存绝对值
 - 金额、税额和价税合计
@@ -345,7 +337,7 @@ src/
 **inventory_ledger**
 
 - `id`
-- `price_version_id`
+- `product_id`
 - `change_quantity`
 - `balance_before`
 - `balance_after`
@@ -354,7 +346,7 @@ src/
 - `reason`
 - `created_at`
 
-`price_versions.stock_balance` 用于查询，`inventory_ledger` 为变更证据。两者必须在同一事务更新。
+`products.stock_balance` 用于查询，`inventory_ledger` 为变更证据。两者必须在同一事务更新。
 
 **audit_events**
 
@@ -377,7 +369,7 @@ IPC 使用 `invoke/handle` 请求响应模型，所有入参和出参均经 Zod 
 主要命名空间：
 
 - `customers.*`：分页、详情、新增、编辑、停用、首次导入预览、首次导入确认、历史。
-- `catalog.*`：商品和价格版本 CRUD、商品首次导入、商品日常导入、库存查询。
+- `catalog.*`：商品及唯一含税单价 CRUD、商品首次导入、商品日常导入、库存查询。
 - `outbound.*`：创建草稿校验、导出、列表、详情、重新下载、作废。
 - `replenishment.*`：月底负库存预览、导出、历史和重新下载。
 - `inbound.*`：月初总部进项预览、确认、列表、详情、作废。
@@ -393,7 +385,7 @@ IPC 使用 `invoke/handle` 请求响应模型，所有入参和出参均经 Zod 
 
 ### 8.1 销项导出
 
-1. 主进程重新读取并校验客户、价格版本和数量。
+1. 主进程重新读取并校验客户、商品、当前含税单价和数量。
 2. 使用当前模板生成内存 XLSX。
 3. 校验 XLSX ZIP 结构、必需工作表、版本单元格及明细行。
 4. 弹出保存对话框并写入临时文件。
@@ -429,9 +421,9 @@ IPC 使用 `invoke/handle` 请求响应模型，所有入参和出参均经 Zod 
 确认阶段必须重新解析文件或校验预览令牌，随后在单个 SQLite 事务中：
 
 - 插入进项批次与明细。
-- 精确匹配已有商品和价格版本。
-- 已有负库存的版本若导入量超过绝对值则回滚整批。
-- 已有非负库存版本允许继续增加。
+- 精确匹配已有商品；导入价格不同时更新商品当前含税单价。
+- 已有负库存商品若导入量超过绝对值则回滚整批。
+- 已有非负库存商品允许继续增加。
 - 全新商品自动创建；缺少税收编码时标记 incomplete。
 - 写入正向库存流水、余额及字段审计。
 
@@ -464,10 +456,10 @@ IPC 使用 `invoke/handle` 请求响应模型，所有入参和出参均经 Zod 
 
 ### 9.2 月底负库存导出
 
-月底导出使用同一数据库读快照查询全部 `stock_balance < 0` 的启用价格版本，不读取开票日期范围，也不按开票明细汇总。
+月底导出使用同一数据库读快照查询全部 `stock_balance < 0` 的启用商品，不读取开票日期范围，也不按开票明细汇总。
 
 - `replenishment_quantity = abs(stock_balance)`。
-- 金额按快照数量和价格版本单价计算。
+- 金额按快照数量和商品当前含税单价计算。
 - 查询、生成 XLSX、保存导出记录和 XLSX BLOB 使用同一份不可变快照。
 - 导出记录不写库存流水。
 - 查询结果为空时不生成文件或记录。
@@ -634,7 +626,7 @@ COS 界面由渲染进程的全局设置抽屉承载，建议拆分为：
 - 普通列表首屏小于 1 秒，搜索小于 500 毫秒。
 - 1 万行导入预览小于 10 秒，过程显示进度且界面可取消。
 - 大任务在主进程 Worker Thread 执行，数据库最终写入仍串行事务化。
-- 索引覆盖导出时间、客户、状态、商品规范名、型号、价格版本和流水时间；页面三使用 `outbound_batches(exported_at, id)`、`outbound_batches(status, exported_at)` 及明细商品检索索引。
+- 索引覆盖导出时间、客户、状态、商品规范名、型号、商品库存和流水时间；页面三使用 `outbound_batches(exported_at, id)`、`outbound_batches(status, exported_at)` 及明细商品检索索引。
 
 ## 15. 实施阶段
 

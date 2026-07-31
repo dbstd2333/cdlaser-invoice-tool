@@ -9,7 +9,11 @@ import { adjustInventory } from '../domains/inventory/adjust-service';
  */
 export function registerInventoryIpc(): void {
   registerHandler(IPC_CHANNELS.inventory.ledger, ledgerQuerySchema, (input) => {
-    return queryLedger(input.priceVersionId, input.page, input.pageSize);
+    return queryLedger({
+      productId: input.productId,
+      page: input.page,
+      pageSize: input.pageSize,
+    });
   });
 
   registerHandler(IPC_CHANNELS.inventory.adjust, inventoryAdjustSchema, (input) => {

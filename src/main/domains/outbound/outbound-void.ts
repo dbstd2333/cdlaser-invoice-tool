@@ -1,5 +1,5 @@
 import { getDb, getRawDb } from '../../db/connection';
-import { outboundBatches, outboundLines, priceVersions } from '../../db/schema/index';
+import { outboundBatches, outboundLines, products } from '../../db/schema/index';
 import { toCamel, toCamelList } from '../../db/case-mapper';
 import { eq } from 'drizzle-orm';
 import type { OutboundBatch } from '@shared/contracts/types';
@@ -59,18 +59,18 @@ function restoreOutboundLine(
   reason: string,
   line: typeof outboundLines.$inferSelect,
 ): void {
-  const pvRow = raw.prepare('SELECT stock_balance FROM price_versions WHERE id = ?').get(line.priceVersionId) as { stock_balance: number } | undefined;
-  if (!pvRow) throw new Error(`价格版本 ${line.priceVersionId} 不存在`);
+  const productRow = raw.prepare('SELECT stock_balance FROM products WHERE id = ?').get(line.productId) as { stock_balance: number } | undefined;
+  if (!productRow) throw new Error(`商品 ${line.productId} 不存在`);
 
-  const balanceBefore = pvRow.stock_balance;
+  const balanceBefore = productRow.stock_balance;
   const balanceAfter = balanceBefore + line.quantity;
 
   appendLedger({
-    priceVersionId: line.priceVersionId, changeQuantity: line.quantity, balanceBefore,
+    productId: line.productId, changeQuantity: line.quantity, balanceBefore,
     sourceType: 'outbound_void', sourceId: batchId, reason: `销项作废 ${batchNo}: ${reason}`,
   });
 
-  db.update(priceVersions)
+  db.update(products)
     .set({ stockBalance: balanceAfter, updatedAt: new Date().toISOString() })
-    .where(eq(priceVersions.id, line.priceVersionId)).run();
+    .where(eq(products.id, line.productId)).run();
 }

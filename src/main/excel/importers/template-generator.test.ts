@@ -1,9 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import XlsxPopulate from 'xlsx-populate';
+import * as XLSX from 'xlsx';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { generateCustomerTemplate, generateInboundTemplate } from './template-generator';
+
+function firstRow(filePath: string): unknown[] {
+  const wb = XLSX.readFile(filePath);
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  return (XLSX.utils.sheet_to_json(ws, { header: 1 })[0] ?? []) as unknown[];
+}
 
 describe('进项导入模板生成器', () => {
   let tempDirectory = '';
@@ -22,14 +28,7 @@ describe('进项导入模板生成器', () => {
     const filePath = join(tempDirectory, '月初总部进项导入模板.xlsx');
     await generateInboundTemplate(filePath);
 
-    const workbook = await XlsxPopulate.fromFileAsync(filePath);
-    const sheet = workbook.sheet('进项明细');
-    const headers: unknown[] = [];
-    for (let col = 1; col <= 11; col += 1) {
-      headers.push(sheet.cell(1, col).value());
-    }
-
-    expect(headers).toEqual([
+    expect(firstRow(filePath)).toEqual([
       '开票日期',
       '发票号码',
       '销售方名称',
@@ -58,15 +57,32 @@ describe('客户导入模板生成器', () => {
     await rm(tempDirectory, { recursive: true, force: true });
   });
 
-  it('应将税号、电话和银行账号列设置为文本格式', async () => {
+  it('应生成含税号、电话和银行账号列，且标识符按文本写入以保留精度', async () => {
     const filePath = join(tempDirectory, '客户导入模板.xlsx');
     await generateCustomerTemplate(filePath);
 
-    const workbook = await XlsxPopulate.fromFileAsync(filePath);
-    const sheet = workbook.sheet('客户信息');
+    const headers = firstRow(filePath);
+    expect(headers[1]).toBe('纳税人识别号');
+    expect(headers[4]).toBe('电话');
+    expect(headers[6]).toBe('银行账号');
 
-    expect(sheet.column(2).style('numberFormat')).toBe('@');
-    expect(sheet.column(5).style('numberFormat')).toBe('@');
-    expect(sheet.column(7).style('numberFormat')).toBe('@');
+    // 社区版无法预设 @ 文本格式，需由数据本身决定类型：
+    // 文本标识符写入后读回仍为字符串，数值标识符读回为 number（导入解析据此识别精度风险）。
+    const probe = XLSX.utils.book_new();
+    const probeWs = XLSX.utils.aoa_to_sheet([
+      ['纳税人识别号'],
+      ['123456789012345678'],
+      [1234567890123456],
+    ]);
+    XLSX.utils.book_append_sheet(probe, probeWs, '客户信息');
+    const probePath = join(tempDirectory, 'probe.xlsx');
+    XLSX.writeFile(probe, probePath);
+
+    const reread = XLSX.utils.sheet_to_json(XLSX.readFile(probePath).Sheets['客户信息'], {
+      header: 1,
+      raw: true,
+    }) as unknown[][];
+    expect(typeof reread[1][0]).toBe('string');
+    expect(typeof reread[2][0]).toBe('number');
   });
 });

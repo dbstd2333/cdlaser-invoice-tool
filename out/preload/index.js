@@ -25,19 +25,18 @@ var IPC_CHANNELS = {
 		history: "customers.history"
 	},
 	catalog: {
-		listPriceVersions: "catalog.listPriceVersions",
+		listProducts: "catalog.listProducts",
 		getProductById: "catalog.getProductById",
 		createProduct: "catalog.createProduct",
 		updateProduct: "catalog.updateProduct",
-		createPriceVersion: "catalog.createPriceVersion",
 		deleteProduct: "catalog.deleteProduct",
-		getPriceVersionsByProduct: "catalog.getPriceVersionsByProduct",
 		initialImportPreview: "catalog.initialImportPreview",
 		initialImportConfirm: "catalog.initialImportConfirm",
 		dailyImportPreview: "catalog.dailyImportPreview",
 		dailyImportConfirm: "catalog.dailyImportConfirm",
 		downloadTemplate: "catalog.downloadTemplate",
-		fieldHistory: "catalog.fieldHistory"
+		fieldHistory: "catalog.fieldHistory",
+		stockSummary: "catalog.stockSummary"
 	},
 	outbound: {
 		validateDraft: "outbound.validateDraft",
@@ -45,7 +44,8 @@ var IPC_CHANNELS = {
 		list: "outbound.list",
 		getDetail: "outbound.getDetail",
 		download: "outbound.download",
-		void: "outbound.void"
+		void: "outbound.void",
+		monthlyTax: "outbound.monthlyTax"
 	},
 	replenishment: {
 		preview: "replenishment.preview",
@@ -110,19 +110,18 @@ electron.contextBridge.exposeInMainWorld("api", {
 		downloadTemplate: () => invoke(IPC_CHANNELS.customers.downloadTemplate)
 	},
 	catalog: {
-		listPriceVersions: (params) => invoke(IPC_CHANNELS.catalog.listPriceVersions, params),
+		listProducts: (params) => invoke(IPC_CHANNELS.catalog.listProducts, params),
 		getProductById: (id) => invoke(IPC_CHANNELS.catalog.getProductById, id),
 		createProduct: (params) => invoke(IPC_CHANNELS.catalog.createProduct, params),
 		updateProduct: (params) => invoke(IPC_CHANNELS.catalog.updateProduct, params),
-		createPriceVersion: (params) => invoke(IPC_CHANNELS.catalog.createPriceVersion, params),
 		deleteProduct: (id) => invoke(IPC_CHANNELS.catalog.deleteProduct, id),
 		initialImportPreview: (filePath) => invoke(IPC_CHANNELS.catalog.initialImportPreview, filePath),
 		initialImportConfirm: (token) => invoke(IPC_CHANNELS.catalog.initialImportConfirm, token),
 		dailyImportPreview: (filePath) => invoke(IPC_CHANNELS.catalog.dailyImportPreview, filePath),
 		dailyImportConfirm: (token) => invoke(IPC_CHANNELS.catalog.dailyImportConfirm, token),
 		fieldHistory: (params) => invoke(IPC_CHANNELS.catalog.fieldHistory, params),
-		getPriceVersionsByIds: (ids) => invoke("catalog.getPriceVersionsByIds", ids),
-		getPriceVersionsByProduct: (productId) => invoke(IPC_CHANNELS.catalog.getPriceVersionsByProduct, productId),
+		stockSummary: () => invoke(IPC_CHANNELS.catalog.stockSummary, {}),
+		getProductsByIds: (ids) => invoke("catalog.getProductsByIds", ids),
 		downloadTemplate: (isInitial) => invoke(IPC_CHANNELS.catalog.downloadTemplate, { isInitial })
 	},
 	outbound: {
@@ -134,7 +133,8 @@ electron.contextBridge.exposeInMainWorld("api", {
 		void: (id, reason) => invoke(IPC_CHANNELS.outbound.void, {
 			id,
 			reason
-		})
+		}),
+		monthlyTax: () => invoke(IPC_CHANNELS.outbound.monthlyTax, {})
 	},
 	replenishment: {
 		preview: () => invoke(IPC_CHANNELS.replenishment.preview),
@@ -161,11 +161,7 @@ electron.contextBridge.exposeInMainWorld("api", {
 		})
 	},
 	inventory: {
-		ledger: (priceVersionId, page, pageSize) => invoke(IPC_CHANNELS.inventory.ledger, {
-			priceVersionId,
-			page,
-			pageSize
-		}),
+		ledger: (params) => invoke(IPC_CHANNELS.inventory.ledger, params),
 		adjust: (params) => invoke(IPC_CHANNELS.inventory.adjust, params),
 		consistencyCheck: () => invoke(IPC_CHANNELS.inventory.consistencyCheck)
 	},

@@ -5,7 +5,7 @@
 /** 校验开票草稿结果（打开 Modal 前重新读取并校验） */
 export interface DraftValidationResult {
   validLines: Array<{
-    priceVersionId: string;
+    productId: string;
     name: string;
     model: string;
     unit: string;
@@ -15,7 +15,7 @@ export interface DraftValidationResult {
     quantity: number;
     amountCent?: number;
   }>;
-  invalidPriceVersionIds: string[];
+  invalidProductIds: string[];
   errors: string[];
 }
 

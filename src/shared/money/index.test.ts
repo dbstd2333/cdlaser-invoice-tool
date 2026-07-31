@@ -7,6 +7,7 @@ import {
   scaleAmountCent,
   amountCentToUnitPrice,
   roundCentToWholeYuan,
+  roundUnitPriceToWholeYuan,
   scaleUnitPrice,
   calcTaxCent,
   calcTotalCent,
@@ -118,6 +119,12 @@ describe('金额计算', () => {
       expect(roundCentToWholeYuan(12549)).toBe(12500);
       expect(roundCentToWholeYuan(12550)).toBe(12600);
       expect(roundCentToWholeYuan(12600)).toBe(12600);
+    });
+
+    it('应将含税单价四舍五入到整数元', () => {
+      expect(roundUnitPriceToWholeYuan('125.49')).toBe('125');
+      expect(roundUnitPriceToWholeYuan('125.50')).toBe('126');
+      expect(roundUnitPriceToWholeYuan('126')).toBe('126');
     });
   });
 
