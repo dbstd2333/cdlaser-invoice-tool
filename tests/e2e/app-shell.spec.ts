@@ -1,57 +1,35 @@
-import { test, expect, _electron as electron } from '@playwright/test';
-import { resolve } from 'node:path';
+import { expect, test, _electron as electron } from '@playwright/test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
-/**
- * Electron 端到端测试 - 应用壳和基本导航。
- * 对应技术 PRD 第 13.4 节：应用壳覆盖左侧菜单折叠、路由高亮、面包屑、内容滚动，
- * 以及启动默认落在 /inventory 且菜单高亮正确。
- */
-
-test.describe('应用壳', () => {
-  test('启动后默认进入页面二（/inventory）', async () => {
-    const electronApp = await electron.launch({
-      args: [resolve(__dirname, '../../dist/main/index.js')],
-    });
-    const window = await electronApp.firstWindow();
-
-    // 等待应用加载
-    await window.waitForSelector('.app-container', { timeout: 15000 });
-
-    // 验证默认路由为 /inventory
-    const activeMenu = await window.locator('.el-menu-item.is-active').textContent();
-    expect(activeMenu).toContain('商品');
-
-    await electronApp.close();
+/** 以 file:// 生产入口启动 Electron，验证 Hash Router 不会渲染 404。 */
+test('Windows 同构生产入口可打开库存页并切换路由', async () => {
+  const userDataDir = await mkdtemp(join(tmpdir(), 'cdlaser-e2e-'));
+  const electronApp = await electron.launch({
+    args: [resolve(__dirname, '../../out/main/index.js')],
+    env: {
+      ...process.env,
+      CDLASER_E2E_PRODUCTION: '1',
+      CDLASER_E2E_USER_DATA_DIR: userDataDir,
+    },
   });
 
-  test('左侧菜单包含三个一级页面', async () => {
-    const electronApp = await electron.launch({
-      args: [resolve(__dirname, '../../dist/main/index.js')],
-    });
+  try {
     const window = await electronApp.firstWindow();
+    await expect(window.getByText('库存与开票', { exact: true }).first()).toBeVisible();
+    await expect(window.getByText('Unexpected Application Error')).toHaveCount(0);
+    expect(await window.evaluate(() => window.location.protocol)).toBe('file:');
+    expect(['', '#/']).toContain(await window.evaluate(() => window.location.hash));
 
-    await window.waitForSelector('.app-container', { timeout: 15000 });
+    await window.getByText('客户管理', { exact: true }).first().click();
+    await expect(window.getByText('客户管理', { exact: true }).last()).toBeVisible();
+    expect(await window.evaluate(() => window.location.hash)).toBe('#/customers');
 
-    const menuItems = await window.locator('.el-menu-item').allTextContents();
-    expect(menuItems.some((t) => t.includes('客户管理'))).toBeTruthy();
-    expect(menuItems.some((t) => t.includes('商品'))).toBeTruthy();
-    expect(menuItems.some((t) => t.includes('开票记录'))).toBeTruthy();
-
+    await window.getByText('开票记录', { exact: true }).first().click();
+    expect(await window.evaluate(() => window.location.hash)).toBe('#/outbound-records');
+  } finally {
     await electronApp.close();
-  });
-
-  test('设置入口位于菜单左下角', async () => {
-    const electronApp = await electron.launch({
-      args: [resolve(__dirname, '../../dist/main/index.js')],
-    });
-    const window = await electronApp.firstWindow();
-
-    await window.waitForSelector('.app-container', { timeout: 15000 });
-
-    // 验证设置入口存在
-    const settingsItem = window.locator('.app-sidebar-footer');
-    await expect(settingsItem).toBeVisible();
-
-    await electronApp.close();
-  });
+    await rm(userDataDir, { recursive: true, force: true });
+  }
 });

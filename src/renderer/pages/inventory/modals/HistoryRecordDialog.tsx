@@ -4,6 +4,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type {
   FieldHistoryEntry,
   InventoryLedger,
+  Product,
 } from '@shared/contracts/types';
 import { api } from '@renderer/api';
 

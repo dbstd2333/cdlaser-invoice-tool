@@ -5030,7 +5030,7 @@ function createWindow() {
 		}
 	});
 	registerAllowedWindow(mainWindow);
-	const isDev = !electron.app.isPackaged;
+	const isDev = !electron.app.isPackaged && process.env["CDLASER_E2E_PRODUCTION"] !== "1";
 	const cspHeader = isDev ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'" : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'";
 	mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
 		callback({ responseHeaders: {

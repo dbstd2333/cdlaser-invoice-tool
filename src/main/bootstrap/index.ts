@@ -58,7 +58,7 @@ function createWindow(): void {
   // 设置 CSP
   // 开发模式需放行 'unsafe-inline'：Vite + @vitejs/plugin-react 会注入 React Fast Refresh 内联 preamble 脚本，
   // 严格 CSP 会拦截该内联脚本，导致 "can't detect preamble" 错误。生产模式保持严格限制。
-  const isDev = !app.isPackaged;
+  const isDev = !app.isPackaged && process.env['CDLASER_E2E_PRODUCTION'] !== '1';
   const cspHeader = isDev
     ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'"
     : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'";

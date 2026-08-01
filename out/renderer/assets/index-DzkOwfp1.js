@@ -10213,24 +10213,30 @@ var PopStateEventType = "popstate";
 function isLocation(obj) {
 	return typeof obj === "object" && obj != null && "pathname" in obj && "search" in obj && "hash" in obj && "state" in obj && "key" in obj;
 }
-function createBrowserHistory(options = {}) {
-	function createBrowserLocation(window2, globalHistory) {
-		let maskedLocation = globalHistory.state?.masked;
-		let { pathname, search, hash } = maskedLocation || window2.location;
+function createHashHistory(options = {}) {
+	function createHashLocation(window2, globalHistory) {
+		let { pathname = "/", search = "", hash = "" } = parsePath(window2.location.hash.substring(1));
+		if (!pathname.startsWith("/") && !pathname.startsWith(".")) pathname = "/" + pathname;
 		return createLocation("", {
 			pathname,
 			search,
 			hash
-		}, globalHistory.state && globalHistory.state.usr || null, globalHistory.state && globalHistory.state.key || "default", maskedLocation ? {
-			pathname: window2.location.pathname,
-			search: window2.location.search,
-			hash: window2.location.hash
-		} : void 0);
+		}, globalHistory.state && globalHistory.state.usr || null, globalHistory.state && globalHistory.state.key || "default");
 	}
-	function createBrowserHref(window2, to) {
-		return typeof to === "string" ? to : createPath(to);
+	function createHashHref(window2, to) {
+		let base = window2.document.querySelector("base");
+		let href = "";
+		if (base && base.getAttribute("href")) {
+			let url = window2.location.href;
+			let hashIndex = url.indexOf("#");
+			href = hashIndex === -1 ? url : url.slice(0, hashIndex);
+		}
+		return href + "#" + (typeof to === "string" ? to : createPath(to));
 	}
-	return getUrlBasedHistory(createBrowserLocation, createBrowserHref, null, options);
+	function validateHashLocation(location, to) {
+		warning$3(location.pathname.charAt(0) === "/", `relative pathnames are not supported in hash history.push(${JSON.stringify(to)})`);
+	}
+	return getUrlBasedHistory(createHashLocation, createHashHref, validateHashLocation, options);
 }
 function invariant(value, message) {
 	if (value === false || value === null || typeof value === "undefined") throw new Error(message);
@@ -14191,6 +14197,30 @@ function DataRoutes2({ routes, manifest, future, state, isStatic, onError }) {
 		future
 	});
 }
+function Navigate({ to, replace: replace2, state, relative }) {
+	invariant(useInRouterContext(), `<Navigate> may be used only in the context of a <Router> component.`);
+	let { static: isStatic } = import_react.useContext(NavigationContext);
+	warning$3(!isStatic, `<Navigate> must not be used on the initial render in a <StaticRouter>. This is a no-op, but you should modify your code so the <Navigate> is only ever rendered in response to some user interaction or state change.`);
+	let { matches } = import_react.useContext(RouteContext);
+	let { pathname: locationPathname } = useLocation();
+	let navigate = useNavigate();
+	let path = resolveTo(to, getResolveToMatches(matches), locationPathname, relative === "path");
+	let jsonPath = JSON.stringify(path);
+	import_react.useEffect(() => {
+		navigate(JSON.parse(jsonPath), {
+			replace: replace2,
+			state,
+			relative
+		});
+	}, [
+		navigate,
+		jsonPath,
+		relative,
+		replace2,
+		state
+	]);
+	return null;
+}
 function Outlet(props) {
 	return useOutlet(props.context);
 }
@@ -14695,12 +14725,12 @@ var isBrowser2 = typeof window !== "undefined" && typeof window.document !== "un
 try {
 	if (isBrowser2) window.__reactRouterVersion = "7.18.2";
 } catch (e) {}
-function createBrowserRouter(routes, opts) {
+function createHashRouter(routes, opts) {
 	return createRouter({
 		basename: opts?.basename,
 		getContext: opts?.getContext,
 		future: opts?.future,
-		history: createBrowserHistory({ window: opts?.window }),
+		history: createHashHistory({ window: opts?.window }),
 		hydrationData: opts?.hydrationData || parseHydrationData(),
 		routes,
 		mapRouteProperties,
@@ -73346,14 +73376,14 @@ function CosBackupPanel() {
 //#region src/renderer/layouts/AppShell/AppSidebar.tsx
 var items = [
 	{
-		to: "/customers",
-		label: "客户管理",
-		icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RefIcon, {})
-	},
-	{
 		to: "/inventory",
 		label: "库存与开票",
 		icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RefIcon$3, {})
+	},
+	{
+		to: "/customers",
+		label: "客户管理",
+		icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RefIcon, {})
 	},
 	{
 		to: "/outbound-records",
@@ -76210,32 +76240,6 @@ function InventoryToolbar({ name, model, stockStatus, onNameChange, onModelChang
 				className: "bg-white border border-line rounded-lg p-4 flex-1 min-w-[280px]",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 					className: "text-sm font-medium text-gray-700 mb-3",
-					children: "商品管理"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Space, {
-					wrap: true,
-					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
-							type: "primary",
-							icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RefIcon$35, {}),
-							onClick: onAddProduct,
-							children: "新增商品"
-						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
-							icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RefIcon$1, {}),
-							onClick: onDailyImport,
-							children: "商品导入"
-						}),
-						!productImportDone && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
-							danger: true,
-							onClick: onInitialImport,
-							children: "初始化导入"
-						})
-					]
-				})]
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: "bg-white border border-line rounded-lg p-4 flex-1 min-w-[280px]",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-					className: "text-sm font-medium text-gray-700 mb-3",
 					children: "库存与开票"
 				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Space, {
 					wrap: true,
@@ -76254,6 +76258,31 @@ function InventoryToolbar({ name, model, stockStatus, onNameChange, onModelChang
 							onClick: onMonthBeginningImport,
 							icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RefIcon$6, {}),
 							children: "月初进项"
+						})
+					]
+				})]
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "bg-white border border-line rounded-lg p-4 flex-1 min-w-[280px]",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "text-sm font-medium text-gray-700 mb-3",
+					children: "商品管理"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Space, {
+					wrap: true,
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
+							icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RefIcon$35, {}),
+							onClick: onAddProduct,
+							children: "新增商品"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
+							icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RefIcon$1, {}),
+							onClick: onDailyImport,
+							children: "商品导入"
+						}),
+						!productImportDone && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
+							danger: true,
+							onClick: onInitialImport,
+							children: "初始化导入"
 						})
 					]
 				})]
@@ -76739,34 +76768,27 @@ var SOURCE_LABEL = {
 	adjustment: "库存调整"
 };
 function HistoryRecordDialog({ open, product, onClose }) {
-	const [tab, setTab] = (0, import_react.useState)("overview");
-	const [currentProduct, setCurrentProduct] = (0, import_react.useState)(null);
+	const [tab, setTab] = (0, import_react.useState)("ledger");
 	const [ledger, setLedger] = (0, import_react.useState)([]);
 	const [history, setHistory] = (0, import_react.useState)([]);
 	const [loading, setLoading] = (0, import_react.useState)(false);
 	(0, import_react.useEffect)(() => {
 		if (open && product) {
 			setLoading(true);
-			Promise.all([
-				api.catalog.getProductById(product.id),
-				api.inventory.ledger({
-					productId: product.id,
-					page: 1,
-					pageSize: 50
-				}),
-				api.catalog.fieldHistory({
-					entityType: "product",
-					entityId: product.id,
-					page: 1,
-					pageSize: 50
-				})
-			]).then(([v, l, h]) => {
-				setCurrentProduct(v);
+			Promise.all([api.inventory.ledger({
+				productId: product.id,
+				page: 1,
+				pageSize: 50
+			}), api.catalog.fieldHistory({
+				entityType: "product",
+				entityId: product.id,
+				page: 1,
+				pageSize: 50
+			})]).then(([l, h]) => {
 				setLedger(l.rows);
 				setHistory(h.rows);
 			}).finally(() => setLoading(false));
 		} else {
-			setCurrentProduct(null);
 			setLedger([]);
 			setHistory([]);
 		}
@@ -76779,148 +76801,105 @@ function HistoryRecordDialog({ open, product, onClose }) {
 		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tabs, {
 			activeKey: tab,
 			onChange: setTab,
-			items: [
-				{
-					key: "overview",
-					label: "库存一览",
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(table_default, {
-						rowKey: "id",
-						size: "small",
-						loading,
-						columns: [
-							{
-								title: "型号",
-								dataIndex: "model",
-								width: 140,
-								ellipsis: true
-							},
-							{
-								title: "单位",
-								dataIndex: "unit",
-								width: 80
-							},
-							{
-								title: "含税单价",
-								dataIndex: "unitPriceDecimal",
-								width: 130,
-								align: "right",
-								render: (v) => `¥${v}`
-							},
-							{
-								title: "当前库存",
-								dataIndex: "stockBalance",
-								width: 120,
-								render: (v) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tag, {
-									color: v > 0 ? "success" : v < 0 ? "error" : "default",
-									children: getStockStatusText(v)
-								})
-							}
-						],
-						dataSource: currentProduct ? [currentProduct] : [],
-						pagination: false
-					})
-				},
-				{
-					key: "ledger",
-					label: `库存流水 (${ledger.length})`,
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(table_default, {
-						rowKey: "id",
-						size: "small",
-						loading,
-						columns: [
-							{
-								title: "时间",
-								dataIndex: "createdAt",
-								width: 170,
-								render: (v) => formatTime$2(v)
-							},
-							{
-								title: "来源",
-								dataIndex: "sourceType",
-								width: 110,
-								render: (v) => SOURCE_LABEL[v] ?? v
-							},
-							{
-								title: "变更量",
-								dataIndex: "changeQuantity",
-								width: 90,
-								align: "right",
-								render: (v) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-									className: v > 0 ? "text-green-600" : "text-red-600",
-									children: v > 0 ? `+${v}` : v
-								})
-							},
-							{
-								title: "变更前",
-								dataIndex: "balanceBefore",
-								width: 90,
-								align: "right"
-							},
-							{
-								title: "变更后",
-								dataIndex: "balanceAfter",
-								width: 90,
-								align: "right"
-							},
-							{
-								title: "原因",
-								dataIndex: "reason",
-								ellipsis: true,
-								render: (v) => v ?? "—"
-							}
-						],
-						dataSource: ledger,
-						pagination: false
-					})
-				},
-				{
-					key: "history",
-					label: `变更历史 (${history.length})`,
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(table_default, {
-						rowKey: "id",
-						size: "small",
-						loading,
-						columns: [
-							{
-								title: "时间",
-								dataIndex: "createdAt",
-								width: 170,
-								render: (v) => formatTime$2(v)
-							},
-							{
-								title: "动作",
-								dataIndex: "action",
-								width: 120
-							},
-							{
-								title: "字段",
-								dataIndex: "fieldPath",
-								width: 140,
-								ellipsis: true
-							},
-							{
-								title: "原值",
-								dataIndex: "oldValue",
-								ellipsis: true,
-								render: (v) => v ?? "—"
-							},
-							{
-								title: "新值",
-								dataIndex: "newValue",
-								ellipsis: true,
-								render: (v) => v ?? "—"
-							},
-							{
-								title: "操作人",
-								dataIndex: "operator",
-								width: 120
-							}
-						],
-						dataSource: history,
-						pagination: false
-					})
-				}
-			]
+			items: [{
+				key: "ledger",
+				label: `库存流水 (${ledger.length})`,
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(table_default, {
+					rowKey: "id",
+					size: "small",
+					loading,
+					columns: [
+						{
+							title: "时间",
+							dataIndex: "createdAt",
+							width: 170,
+							render: (v) => formatTime$2(v)
+						},
+						{
+							title: "来源",
+							dataIndex: "sourceType",
+							width: 110,
+							render: (v) => SOURCE_LABEL[v] ?? v
+						},
+						{
+							title: "变更量",
+							dataIndex: "changeQuantity",
+							width: 90,
+							align: "right",
+							render: (v) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: v > 0 ? "text-green-600" : "text-red-600",
+								children: v > 0 ? `+${v}` : v
+							})
+						},
+						{
+							title: "变更前",
+							dataIndex: "balanceBefore",
+							width: 90,
+							align: "right"
+						},
+						{
+							title: "变更后",
+							dataIndex: "balanceAfter",
+							width: 90,
+							align: "right"
+						},
+						{
+							title: "原因",
+							dataIndex: "reason",
+							ellipsis: true,
+							render: (v) => v ?? "—"
+						}
+					],
+					dataSource: ledger,
+					pagination: false
+				})
+			}, {
+				key: "history",
+				label: `变更历史 (${history.length})`,
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(table_default, {
+					rowKey: "id",
+					size: "small",
+					loading,
+					columns: [
+						{
+							title: "时间",
+							dataIndex: "createdAt",
+							width: 170,
+							render: (v) => formatTime$2(v)
+						},
+						{
+							title: "动作",
+							dataIndex: "action",
+							width: 120
+						},
+						{
+							title: "字段",
+							dataIndex: "fieldPath",
+							width: 140,
+							ellipsis: true
+						},
+						{
+							title: "原值",
+							dataIndex: "oldValue",
+							ellipsis: true,
+							render: (v) => v ?? "—"
+						},
+						{
+							title: "新值",
+							dataIndex: "newValue",
+							ellipsis: true,
+							render: (v) => v ?? "—"
+						},
+						{
+							title: "操作人",
+							dataIndex: "operator",
+							width: 120
+						}
+					],
+					dataSource: history,
+					pagination: false
+				})
+			}]
 		})
 	});
 }
@@ -78355,7 +78334,10 @@ function OutboundRecordsPage() {
 }
 //#endregion
 //#region src/renderer/router/index.tsx
-var router = createBrowserRouter([{
+/**
+* Electron 生产环境使用 file:// 加载页面，Hash Router 可避免把本地文件路径误判为业务路由。
+*/
+var router = createHashRouter([{
 	path: "/",
 	element: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(App, {}),
 	children: [
@@ -78374,6 +78356,13 @@ var router = createBrowserRouter([{
 		{
 			path: "outbound-records",
 			element: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(OutboundRecordsPage, {})
+		},
+		{
+			path: "*",
+			element: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Navigate, {
+				to: "/inventory",
+				replace: true
+			})
 		}
 	]
 }]);
