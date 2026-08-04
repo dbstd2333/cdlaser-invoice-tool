@@ -74,9 +74,11 @@ export function buildDailyImportPreview(rawRows: Omit<CatalogImportRow, 'errors'
 function buildPreview(rawRows: Omit<CatalogImportRow, 'errors' | 'deduped'>[], isInitial: boolean): CatalogImportPreviewResult {
   const rows: CatalogImportRow[] = [];
   const errors: Array<{ rowIndex: number; field: string; reason: string }> = [];
-  const seenProductKeys = new Map<string, number>();
+  const seenPriceKeys = new Map<string, number>();
+  const acceptedProductKeys = new Set<string>();
+  const productMetadata = new Map<string, { unit: string; taxCode: string }>();
   let newProductCount = 0;
-  let updatedProductCount = 0;
+  let newPriceVariantCount = 0;
   let totalStockSum = 0;
   let dedupedRowCount = 0;
 
@@ -90,26 +92,43 @@ function buildPreview(rawRows: Omit<CatalogImportRow, 'errors' | 'deduped'>[], i
     const modelNorm = normalizeKey(row.model);
     const unitPriceNormalized = row.unitPriceDecimal ? normalizeUnitPriceSafe(row.unitPriceDecimal) : '';
     const productKey = `${nameNorm}|${modelNorm}`;
+    const priceKey = `${productKey}|${unitPriceNormalized}`;
 
-    // 一个商品只有一个当前价，文件内相同商品仅保留首行。
-    if (rowErrors.length === 0 && seenProductKeys.has(productKey)) {
+    // 文件内相同名称、型号和规范化价格仅保留首行。
+    if (rowErrors.length === 0 && seenPriceKeys.has(priceKey)) {
       row.deduped = true;
-      row.errors = [`与第 ${seenProductKeys.get(productKey)} 行商品重复，已自动去重`];
+      row.errors = [`与第 ${seenPriceKeys.get(priceKey)} 行商品和价格重复，已自动去重`];
       dedupedRowCount++;
     } else if (rowErrors.length === 0) {
-      seenProductKeys.set(productKey, raw.rowIndex);
+      seenPriceKeys.set(priceKey, raw.rowIndex);
     }
 
     // 数据库重复和冲突检测（已去重行跳过）
     if (rowErrors.length === 0 && !row.deduped) {
+      const metadata = { unit: trimInvisible(row.unit), taxCode: trimInvisible(row.taxClassificationCode) };
+      const knownMetadata = productMetadata.get(productKey);
+      if (knownMetadata && knownMetadata.unit !== metadata.unit) {
+        const error = `单位与同文件商品不一致（已有: ${knownMetadata.unit}）`;
+        row.errors.push(error);
+        errors.push({ rowIndex: raw.rowIndex, field: '', reason: error });
+      }
+      if (knownMetadata && knownMetadata.taxCode !== metadata.taxCode) {
+        const error = '税收分类编码与同文件商品不一致';
+        row.errors.push(error);
+        errors.push({ rowIndex: raw.rowIndex, field: '', reason: error });
+      }
       const dbCheck = checkDatabaseConflict(row, nameNorm, modelNorm, unitPriceNormalized, isInitial);
       dbCheck.errors.forEach((e) => {
         row.errors.push(e);
         errors.push({ rowIndex: raw.rowIndex, field: '', reason: e });
       });
-      if (dbCheck.isNewProduct) newProductCount++;
-      if (dbCheck.priceChanged) updatedProductCount++;
-      if (isInitial && row.initialStock != null) totalStockSum += row.initialStock;
+      if (dbCheck.errors.length === 0 && row.errors.length === 0) {
+        if (dbCheck.hasExistingNameModel || acceptedProductKeys.has(productKey)) newPriceVariantCount++;
+        else newProductCount++;
+        acceptedProductKeys.add(productKey);
+        productMetadata.set(productKey, metadata);
+        if (isInitial && row.initialStock != null) totalStockSum += row.initialStock;
+      }
     }
 
     rows.push(row);
@@ -118,7 +137,7 @@ function buildPreview(rawRows: Omit<CatalogImportRow, 'errors' | 'deduped'>[], i
   // 去重行不算错误，不计入 errorCount / hasErrors
   const errorCount = rows.filter((r) => r.errors.length > 0 && !r.deduped).length;
   return {
-    rows, newProductCount, updatedProductCount,
+    rows, newProductCount, newPriceVariantCount,
     totalStockSum: isInitial ? totalStockSum : 0,
     errorCount, dedupedRowCount, hasErrors: errorCount > 0, errors, isInitial,
   };
@@ -131,27 +150,25 @@ function checkDatabaseConflict(
   modelNorm: string,
   unitPriceNormalized: string,
   isInitial: boolean,
-): { errors: string[]; isNewProduct: boolean; priceChanged: boolean } {
+): { errors: string[]; hasExistingNameModel: boolean } {
   const errors: string[] = [];
-  let isNewProduct = false;
-  let priceChanged = false;
 
-  const existingProduct = getRawDb()
+  const existingProducts = getRawDb()
     .prepare('SELECT id, unit, tax_classification_code, unit_price_decimal FROM products WHERE name_normalized = ? AND model_normalized = ?')
-    .get(nameNorm, modelNorm) as { id: string; unit: string; tax_classification_code: string; unit_price_decimal: string } | undefined;
+    .all(nameNorm, modelNorm) as Array<{ id: string; unit: string; tax_classification_code: string; unit_price_decimal: string }>;
 
-  if (existingProduct) {
-    if (!isInitial && existingProduct.unit !== trimInvisible(row.unit)) {
-      errors.push(`单位与已有商品不一致（已有: ${existingProduct.unit}）`);
+  if (existingProducts.length > 0) {
+    const metadataProduct = existingProducts[0];
+    if (metadataProduct.unit !== trimInvisible(row.unit)) {
+      errors.push(`单位与已有商品不一致（已有: ${metadataProduct.unit}）`);
     }
-    if (!isInitial && existingProduct.tax_classification_code !== trimInvisible(row.taxClassificationCode)) {
+    if (metadataProduct.tax_classification_code !== trimInvisible(row.taxClassificationCode)) {
       errors.push('税收分类编码与已有商品不一致');
     }
-    if (isInitial) errors.push('该商品已存在');
-    priceChanged = existingProduct.unit_price_decimal !== unitPriceNormalized;
-  } else {
-    isNewProduct = true;
+    if (existingProducts.some((product) => product.unit_price_decimal === unitPriceNormalized)) {
+      errors.push(isInitial ? '该商品和含税单价已存在' : '该商品和含税单价已存在，日常导入不允许重复');
+    }
   }
 
-  return { errors, isNewProduct, priceChanged };
+  return { errors, hasExistingNameModel: existingProducts.length > 0 };
 }

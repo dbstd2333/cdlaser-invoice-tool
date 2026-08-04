@@ -53,7 +53,12 @@ export const products = sqliteTable(
     updatedAt: text('updated_at').notNull(),
   },
   (table) => ({
-    nameModelUnique: uniqueIndex('products_name_model_unique').on(table.nameNormalized, table.modelNormalized),
+    nameModelPriceUnique: uniqueIndex('products_name_model_price_unique').on(
+      table.nameNormalized,
+      table.modelNormalized,
+      table.unitPriceDecimal,
+    ),
+    nameModelIdx: index('products_name_model_idx').on(table.nameNormalized, table.modelNormalized),
     statusIdx: index('products_status_idx').on(table.status),
     stockIdx: index('products_stock_idx').on(table.stockBalance),
   }),

@@ -1,4 +1,5 @@
 import { InputNumber, Tag, Typography } from 'antd';
+import type { ReactNode } from 'react';
 import type { ColumnsType } from 'antd/es/table';
 import type { Product } from '@shared/contracts/types';
 import { getStockStatusText } from '@shared/contracts/types';
@@ -27,6 +28,7 @@ export function InventoryTable({
   onPageChange,
   onSizeChange,
   onQuantityChange,
+  toolbar,
 }: {
   rows: Product[];
   loading: boolean;
@@ -39,6 +41,7 @@ export function InventoryTable({
   onPageChange: (page: number) => void;
   onSizeChange: (size: number) => void;
   onQuantityChange: (row: Product, qty: number) => void;
+  toolbar?: ReactNode;
 }) {
   const selectionStore = useSelectionStore();
 
@@ -121,6 +124,7 @@ export function InventoryTable({
       total={total}
       onPageChange={onPageChange}
       onSizeChange={onSizeChange}
+      toolbar={toolbar}
     />
   );
 }

@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { v7 as uuidv7 } from 'uuid';
 
-/** 商品唯一含税单价模型的库存数据库集成测试。 */
+/** 不同价格商品独立库存模型的数据库集成测试。 */
 let db: Database.Database;
 
 beforeAll(() => {
@@ -68,12 +68,18 @@ describe('商品级库存事务', () => {
     expect(changeStock(productId, 5, 'outbound_void')).toBe(2);
   });
 
-  it('含税单价可直接更新且不产生第二条商品记录', () => {
-    const productId = insertProduct(0, '100.00');
-    db.prepare('UPDATE products SET unit_price_decimal = ? WHERE id = ?').run('128.50', productId);
-    const row = db.prepare('SELECT unit_price_decimal FROM products WHERE id = ?').get(productId) as { unit_price_decimal: string };
-    expect(row.unit_price_decimal).toBe('128.50');
-    expect((db.prepare('SELECT COUNT(*) AS count FROM products').get() as { count: number }).count).toBe(1);
+  it('同名同型号不同价格使用独立商品和库存', () => {
+    const firstId = insertProduct(2, '100');
+    const secondId = insertProduct(-3, '128.5');
+    expect(changeStock(firstId, -1, 'outbound')).toBe(1);
+
+    const rows = db.prepare(`
+      SELECT id, unit_price_decimal, stock_balance FROM products ORDER BY unit_price_decimal
+    `).all();
+    expect(rows).toEqual([
+      { id: firstId, unit_price_decimal: '100', stock_balance: 1 },
+      { id: secondId, unit_price_decimal: '128.5', stock_balance: -3 },
+    ]);
   });
 });
 

@@ -28,6 +28,7 @@ export function InboundImportDialog({
       token: res.token,
       ok: !res.preview.hasErrors,
       message: `校验完成，错误 ${(res.preview.errors ?? []).length} 条`,
+      preview: res.preview,
     };
   };
 

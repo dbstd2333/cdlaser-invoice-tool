@@ -80,14 +80,14 @@ describe('商品导入预览 - 自动去重与单价精度', () => {
     expect(preview.dedupedRowCount).toBe(2);
     expect(preview.hasErrors).toBe(false);
     expect(preview.errorCount).toBe(0);
-    // 仅首行有效：新增 1 个商品。
+    // 仅首行有效：新增 1 个名称型号组合。
     expect(preview.newProductCount).toBe(1);
-    expect(preview.updatedProductCount).toBe(0);
+    expect(preview.newPriceVariantCount).toBe(0);
     // 首行正常，后续行标记去重
     expect(preview.rows[0].deduped).toBe(false);
     expect(preview.rows[1].deduped).toBe(true);
     expect(preview.rows[2].deduped).toBe(true);
-    expect(preview.rows[1].errors[0]).toContain('与第 2 行商品重复');
+    expect(preview.rows[1].errors[0]).toContain('与第 2 行商品和价格重复');
   });
 
   it('单价超过 13 位小数自动四舍五入，并按舍入后值去重', () => {
@@ -109,17 +109,18 @@ describe('商品导入预览 - 自动去重与单价精度', () => {
 
     expect(preview.dedupedRowCount).toBe(0);
     expect(preview.newProductCount).toBe(2);
-    expect(preview.updatedProductCount).toBe(0);
+    expect(preview.newPriceVariantCount).toBe(0);
   });
 
-  it('同一商品不同单价仍只保留一个当前价', () => {
+  it('同名同型号不同单价作为独立价格商品保留', () => {
     const preview = buildInitialImportPreview([
       { ...baseRow, rowIndex: 2, unitPriceDecimal: '188.00' },
       { ...baseRow, rowIndex: 3, unitPriceDecimal: '199.00' },
     ]);
 
-    expect(preview.dedupedRowCount).toBe(1);
+    expect(preview.dedupedRowCount).toBe(0);
     expect(preview.newProductCount).toBe(1);
+    expect(preview.newPriceVariantCount).toBe(1);
   });
 
   it('日常导入同样自动去重', () => {
@@ -132,5 +133,24 @@ describe('商品导入预览 - 自动去重与单价精度', () => {
     expect(preview.hasErrors).toBe(false);
     // 日常导入不累加库存
     expect(preview.totalStockSum).toBe(0);
+  });
+
+  it('数据库已有同名型号时允许新价格，拒绝完全相同价格', () => {
+    dbRef.current!.prepare(`
+      INSERT INTO products (
+        id, name, name_normalized, model, model_normalized, unit, tax_classification_code,
+        unit_price_decimal, tax_rate, stock_balance, data_status, status, created_at, updated_at
+      ) VALUES ('p1', '激光器', '激光器', 'CD-100', 'cd-100', '个', '1090127010100000000',
+        '188', 13, 0, 'complete', 'active', '2026-01-01', '2026-01-01')
+    `).run();
+
+    const newPrice = buildDailyImportPreview([{ ...baseRow, rowIndex: 2, unitPriceDecimal: '199.00' }]);
+    expect(newPrice.hasErrors).toBe(false);
+    expect(newPrice.newProductCount).toBe(0);
+    expect(newPrice.newPriceVariantCount).toBe(1);
+
+    const duplicate = buildDailyImportPreview([{ ...baseRow, rowIndex: 2, unitPriceDecimal: '188.0000' }]);
+    expect(duplicate.hasErrors).toBe(true);
+    expect(duplicate.rows[0].errors[0]).toContain('日常导入不允许重复');
   });
 });

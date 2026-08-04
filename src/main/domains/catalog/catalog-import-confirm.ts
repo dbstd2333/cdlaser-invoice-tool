@@ -1,4 +1,3 @@
-import { eq } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { getDb, getRawDb } from '../../db/connection';
 import { products } from '../../db/schema/index';
@@ -11,11 +10,12 @@ import { deleteCachedPreview, getCachedPreview } from './catalog-import-preview'
 import type { CatalogImportRow } from './catalog-import-types';
 
 interface ImportResult {
-  products: number;
-  updatedProducts: number;
+  createdCount: number;
+  newProductCount: number;
+  newPriceVariantCount: number;
 }
 
-/** 首次导入商品、唯一含税单价和初始库存。 */
+/** 首次导入名称型号价格唯一的商品及其初始库存。 */
 export function confirmInitialImport(token: string): ImportResult {
   if (getInitStatus().productInitialImportDone) throw new Error('商品首次导入已完成，不能重复执行');
   const preview = requirePreview(token);
@@ -30,7 +30,7 @@ export function confirmInitialImport(token: string): ImportResult {
   return result;
 }
 
-/** 日常导入新增商品，或更新已有商品的当前含税单价。 */
+/** 日常导入新增商品记录，不覆盖已有商品价格或库存。 */
 export function confirmDailyImport(token: string): ImportResult {
   if (!getInitStatus().productInitialImportDone) throw new Error('商品首次导入尚未完成，不能执行日常导入');
   const preview = requirePreview(token);
@@ -49,47 +49,46 @@ function requirePreview(token: string) {
 
 /** 在单个事务中写入商品导入行。 */
 function writeRows(rows: CatalogImportRow[], isInitial: boolean, batchId: string): ImportResult {
-  let productCount = 0;
-  let updatedProducts = 0;
+  let createdCount = 0;
+  let newProductCount = 0;
+  let newPriceVariantCount = 0;
   const validRows = rows.filter((row) => row.errors.length === 0 && !row.deduped);
   getRawDb().transaction(() => {
     for (const row of validRows) {
-      const existing = findProduct(row);
-      if (existing) {
-        updateImportedProduct(existing.id, row);
-        updatedProducts++;
-      } else {
-        const productId = insertProduct(row, isInitial ? row.initialStock ?? 0 : 0);
-        productCount++;
-        if (isInitial && (row.initialStock ?? 0) !== 0) {
-          appendLedger({
-            productId,
-            changeQuantity: row.initialStock ?? 0,
-            balanceBefore: 0,
-            sourceType: 'initialization',
-            sourceId: batchId,
-            reason: '首次导入初始库存',
-          });
-        }
-        recordAudit({
-          action: isInitial ? 'catalog.initial_import' : 'catalog.daily_import',
-          entityType: 'product',
-          entityId: productId,
-          sourceBatchId: batchId,
-          summary: `${isInitial ? '首次' : '日常'}导入: ${row.name} ${row.model} @ ${row.unitPriceDecimal}`,
+      const hasNameModel = hasProductGroup(row);
+      const productId = insertProduct(row, isInitial ? row.initialStock ?? 0 : 0);
+      createdCount++;
+      if (hasNameModel) newPriceVariantCount++;
+      else newProductCount++;
+      if (isInitial && (row.initialStock ?? 0) !== 0) {
+        appendLedger({
+          productId,
+          changeQuantity: row.initialStock ?? 0,
+          balanceBefore: 0,
+          sourceType: 'initialization',
+          sourceId: batchId,
+          reason: '首次导入初始库存',
         });
       }
+      recordAudit({
+        action: isInitial ? 'catalog.initial_import' : 'catalog.daily_import',
+        entityType: 'product',
+        entityId: productId,
+        sourceBatchId: batchId,
+        summary: `${isInitial ? '首次' : '日常'}导入: ${row.name} ${row.model} @ ${row.unitPriceDecimal}`,
+      });
     }
     markDirty();
   })();
-  return { products: productCount, updatedProducts };
+  return { createdCount, newProductCount, newPriceVariantCount };
 }
 
-/** 查找同名同型号商品。 */
-function findProduct(row: CatalogImportRow): { id: string } | undefined {
-  return getRawDb()
+/** 判断名称和型号组合是否已有任一价格商品。 */
+function hasProductGroup(row: CatalogImportRow): boolean {
+  const existing = getRawDb()
     .prepare('SELECT id FROM products WHERE name_normalized = ? AND model_normalized = ?')
     .get(normalizeKey(row.name), normalizeKey(row.model)) as { id: string } | undefined;
+  return Boolean(existing);
 }
 
 /** 新增导入商品。 */
@@ -114,21 +113,4 @@ function insertProduct(row: CatalogImportRow, stockBalance: number): string {
     updatedAt: now,
   }).run();
   return productId;
-}
-
-/** 更新日常导入商品的资料和当前含税单价。 */
-function updateImportedProduct(productId: string, row: CatalogImportRow): void {
-  getDb().update(products).set({
-    unit: trimInvisible(row.unit),
-    taxClassificationCode: trimInvisible(row.taxClassificationCode),
-    unitPriceDecimal: normalizeUnitPrice(row.unitPriceDecimal),
-    remark: row.remark ? trimInvisible(row.remark) : null,
-    updatedAt: new Date().toISOString(),
-  }).where(eq(products.id, productId)).run();
-  recordAudit({
-    action: 'catalog.daily_import',
-    entityType: 'product',
-    entityId: productId,
-    summary: `日常导入更新含税单价: ${row.name} @ ${row.unitPriceDecimal}`,
-  });
 }

@@ -1,17 +1,45 @@
 import type Database from 'better-sqlite3';
 
-/** 将旧版多价格数据合并为商品唯一含税单价和库存。 */
+interface LegacyPriceVersion {
+  id: string;
+  product_id: string;
+  unit_price_decimal: string;
+  tax_rate: number;
+  stock_balance: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface LegacyProduct {
+  id: string;
+  name: string;
+  name_normalized: string;
+  model: string;
+  model_normalized: string;
+  unit: string;
+  tax_classification_code: string;
+  data_status: string;
+  status: string;
+  remark: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 将旧版价格版本展开为相互独立的商品记录。 */
 export function migrateLegacyPriceVersions(db: Database.Database): void {
   const legacyTable = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'price_versions'").get();
   if (!legacyTable) return;
   addProductColumns(db);
   db.transaction(() => {
-    mergeProductValues(db);
+    db.exec('DROP INDEX IF EXISTS products_name_model_unique');
+    createReferenceMap(db);
+    expandPriceVersions(db);
     for (const table of ['outbound_lines', 'inbound_lines', 'replenishment_export_lines', 'inventory_ledger']) {
       migrateReferenceColumn(db, table);
     }
-    rebuildMergedLedgerBalances(db);
     db.exec('DROP TABLE price_versions');
+    db.exec('DROP TABLE legacy_price_product_map');
   })();
 }
 
@@ -24,27 +52,73 @@ function addProductColumns(db: Database.Database): void {
   if (!names.has('stock_balance')) db.exec('ALTER TABLE products ADD COLUMN stock_balance INTEGER NOT NULL DEFAULT 0');
 }
 
-/** 选取最近启用价格，并合并同商品的全部库存。 */
-function mergeProductValues(db: Database.Database): void {
+/** 创建价格版本到新商品 ID 的临时映射。 */
+function createReferenceMap(db: Database.Database): void {
   db.exec(`
-    UPDATE products
-    SET unit_price_decimal = COALESCE((
-          SELECT unit_price_decimal FROM price_versions
-          WHERE product_id = products.id
-          ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, updated_at DESC, id DESC LIMIT 1
-        ), unit_price_decimal),
-        tax_rate = COALESCE((
-          SELECT tax_rate FROM price_versions
-          WHERE product_id = products.id
-          ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, updated_at DESC, id DESC LIMIT 1
-        ), tax_rate),
-        stock_balance = COALESCE((
-          SELECT SUM(stock_balance) FROM price_versions WHERE product_id = products.id
-        ), 0)
+    CREATE TEMP TABLE legacy_price_product_map (
+      price_version_id TEXT PRIMARY KEY NOT NULL,
+      product_id TEXT NOT NULL
+    )
   `);
 }
 
-/** 把历史表的旧外键转换为商品外键。 */
+/** 将每个旧价格版本转换为独立商品，并保留首个版本的原商品 ID。 */
+function expandPriceVersions(db: Database.Database): void {
+  const products = db.prepare('SELECT * FROM products ORDER BY created_at, id').all() as LegacyProduct[];
+  const versionsQuery = db.prepare(`
+    SELECT * FROM price_versions WHERE product_id = ? ORDER BY created_at, id
+  `);
+  const insertMap = db.prepare('INSERT INTO legacy_price_product_map VALUES (?, ?)');
+  const updateProduct = db.prepare(`
+    UPDATE products SET unit_price_decimal = ?, tax_rate = ?, stock_balance = ?, status = ?, updated_at = ?
+    WHERE id = ?
+  `);
+  const insertProduct = db.prepare(`
+    INSERT INTO products (
+      id, name, name_normalized, model, model_normalized, unit, tax_classification_code,
+      unit_price_decimal, tax_rate, stock_balance, data_status, status, remark, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  for (const product of products) {
+    const versions = versionsQuery.all(product.id) as LegacyPriceVersion[];
+    versions.forEach((version, index) => {
+      const targetId = index === 0 ? product.id : version.id;
+      const status = product.status === 'inactive' || version.status === 'inactive' ? 'inactive' : 'active';
+      if (index === 0) {
+        updateProduct.run(
+          version.unit_price_decimal,
+          version.tax_rate,
+          version.stock_balance,
+          status,
+          version.updated_at,
+          targetId,
+        );
+      } else {
+        insertProduct.run(
+          targetId,
+          product.name,
+          product.name_normalized,
+          product.model,
+          product.model_normalized,
+          product.unit,
+          product.tax_classification_code,
+          version.unit_price_decimal,
+          version.tax_rate,
+          version.stock_balance,
+          product.data_status,
+          status,
+          product.remark,
+          version.created_at,
+          version.updated_at,
+        );
+      }
+      insertMap.run(version.id, targetId);
+    });
+  }
+}
+
+/** 把历史表的价格版本外键转换为独立商品外键。 */
 function migrateReferenceColumn(db: Database.Database, table: string): void {
   if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table)) return;
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
@@ -55,26 +129,10 @@ function migrateReferenceColumn(db: Database.Database, table: string): void {
   }
   db.exec(`
     UPDATE ${table}
-    SET price_version_id = COALESCE(
-      (SELECT product_id FROM price_versions WHERE id = ${table}.price_version_id),
-      price_version_id
-    );
+    SET price_version_id = COALESCE((
+      SELECT product_id FROM legacy_price_product_map
+      WHERE price_version_id = ${table}.price_version_id
+    ), price_version_id);
     ALTER TABLE ${table} RENAME COLUMN price_version_id TO product_id;
   `);
-}
-
-/** 按时间重算合并后的商品级流水余额。 */
-function rebuildMergedLedgerBalances(db: Database.Database): void {
-  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'inventory_ledger'").get()) return;
-  const rows = db.prepare(`
-    SELECT id, product_id, change_quantity FROM inventory_ledger ORDER BY created_at, id
-  `).all() as Array<{ id: string; product_id: string; change_quantity: number }>;
-  const balances = new Map<string, number>();
-  const update = db.prepare('UPDATE inventory_ledger SET balance_before = ?, balance_after = ? WHERE id = ?');
-  for (const row of rows) {
-    const before = balances.get(row.product_id) ?? 0;
-    const after = before + row.change_quantity;
-    update.run(before, after, row.id);
-    balances.set(row.product_id, after);
-  }
 }

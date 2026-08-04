@@ -80,7 +80,7 @@ function insertInboundBatch(db: ReturnType<typeof getDb>, batchId: string, batch
   }).run();
 }
 
-/** 处理单行进项：自动建档或更新含税单价，再写明细和库存流水。 */
+/** 处理单行进项：自动建档或匹配精确价格，再写明细和库存流水。 */
 function processInboundLine(db: ReturnType<typeof getDb>, raw: ReturnType<typeof getRawDb>, batchId: string, batchNo: string, line: InboundPreviewLine): void {
   let productId = line.productId;
 
@@ -107,7 +107,7 @@ function processInboundLine(db: ReturnType<typeof getDb>, raw: ReturnType<typeof
   });
 
   db.update(products)
-    .set({ unitPriceDecimal: line.unitPriceDecimal, stockBalance: balanceAfter, updatedAt: new Date().toISOString() })
+    .set({ stockBalance: balanceAfter, updatedAt: new Date().toISOString() })
     .where(eq(products.id, productId!))
     .run();
 }

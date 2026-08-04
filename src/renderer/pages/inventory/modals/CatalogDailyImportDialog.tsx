@@ -1,6 +1,13 @@
 import { App } from 'antd';
 import { api } from '@renderer/api';
 import { ExcelImportStep } from '../components/ExcelImportStep';
+import {
+  CatalogImportCompletion,
+  CatalogImportConfirmation,
+  CatalogImportPreviewPanel,
+  type CatalogImportResult,
+} from '../components/CatalogImportPreview';
+import type { CatalogImportPreviewResult } from '@shared/contracts/preview-types';
 
 export function CatalogDailyImportDialog({
   open,
@@ -22,32 +29,34 @@ export function CatalogDailyImportDialog({
   const preview = async (filePath: string) => {
     const res = (await api.catalog.dailyImportPreview(filePath)) as {
       token: string;
-      preview: { hasErrors: boolean; errorCount: number };
+      preview: CatalogImportPreviewResult;
     };
     return {
       token: res.token,
       ok: !res.preview.hasErrors,
       message: `校验完成，错误 ${res.preview.errorCount} 条`,
+      preview: res.preview,
     };
   };
 
   const confirm = async (token: string) => {
-    const res = (await api.catalog.dailyImportConfirm(token)) as {
-      products: number;
-      updatedProducts: number;
-    };
-    if (res.products >= 0) onImported();
+    const res = (await api.catalog.dailyImportConfirm(token)) as CatalogImportResult;
+    if (res.createdCount >= 0) onImported();
     return res;
   };
 
   return (
     <ExcelImportStep
       open={open}
-      title="商品每日导入"
-      templateName="商品每日导入模板.xlsx"
+      title="商品日常导入"
+      templateName="商品日常导入模板.xlsx"
       onDownloadTemplate={downloadTemplate}
       onPreview={preview}
       onConfirm={confirm}
+      renderPreview={(result) => <CatalogImportPreviewPanel preview={result} />}
+      renderConfirmation={(result) => <CatalogImportConfirmation preview={result} />}
+      renderCompletion={(result) => <CatalogImportCompletion result={result} />}
+      width="90vw"
       onClose={onClose}
     />
   );

@@ -1,6 +1,13 @@
 import { App } from 'antd';
 import { api } from '@renderer/api';
 import { ExcelImportStep } from '../components/ExcelImportStep';
+import {
+  CatalogImportCompletion,
+  CatalogImportConfirmation,
+  CatalogImportPreviewPanel,
+  type CatalogImportResult,
+} from '../components/CatalogImportPreview';
+import type { CatalogImportPreviewResult } from '@shared/contracts/preview-types';
 
 export function CatalogInitialImportDialog({
   open,
@@ -22,21 +29,19 @@ export function CatalogInitialImportDialog({
   const preview = async (filePath: string) => {
     const res = (await api.catalog.initialImportPreview(filePath)) as {
       token: string;
-      preview: { hasErrors: boolean; errorCount: number };
+      preview: CatalogImportPreviewResult;
     };
     return {
       token: res.token,
       ok: !res.preview.hasErrors,
       message: `校验完成，错误 ${res.preview.errorCount} 条`,
+      preview: res.preview,
     };
   };
 
   const confirm = async (token: string) => {
-    const res = (await api.catalog.initialImportConfirm(token)) as {
-      products: number;
-      updatedProducts: number;
-    };
-    if (res.products >= 0) onImported();
+    const res = (await api.catalog.initialImportConfirm(token)) as CatalogImportResult;
+    if (res.createdCount >= 0) onImported();
     return res;
   };
 
@@ -48,6 +53,10 @@ export function CatalogInitialImportDialog({
       onDownloadTemplate={downloadTemplate}
       onPreview={preview}
       onConfirm={confirm}
+      renderPreview={(result) => <CatalogImportPreviewPanel preview={result} />}
+      renderConfirmation={(result) => <CatalogImportConfirmation preview={result} />}
+      renderCompletion={(result) => <CatalogImportCompletion result={result} />}
+      width="90vw"
       onClose={onClose}
     />
   );

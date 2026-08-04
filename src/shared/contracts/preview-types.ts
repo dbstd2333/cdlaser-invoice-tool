@@ -57,8 +57,10 @@ export interface CatalogImportRow {
 
 export interface CatalogImportPreviewResult {
   rows: CatalogImportRow[];
+  /** 首次出现的名称+型号组合数 */
   newProductCount: number;
-  updatedProductCount: number;
+  /** 已有或同文件名称+型号下新增的价格商品数 */
+  newPriceVariantCount: number;
   totalStockSum: number;
   errorCount: number;
   /** 文件内自动去重的行数（相同商品+型号+单价） */
@@ -113,7 +115,6 @@ export interface InboundPreviewLine {
   totalCent: number;
   isNewProduct: boolean;
   productId: string | null;
-  priceChanged: boolean;
   matched: boolean;
   errors: string[];
 }
@@ -137,7 +138,6 @@ export interface InboundPreviewResult {
   totalTaxCent: number;
   totalCent: number;
   newProductCount: number;
-  updatedProductCount: number;
 }
 
 export interface BackupStatus {

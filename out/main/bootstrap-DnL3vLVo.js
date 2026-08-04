@@ -39,14 +39,14 @@ let drizzle_orm_better_sqlite3 = require("drizzle-orm/better-sqlite3");
 let node_fs = require("node:fs");
 node_fs = __toESM(node_fs);
 let drizzle_orm_sqlite_core = require("drizzle-orm/sqlite-core");
+let decimal_js = require("decimal.js");
+decimal_js = __toESM(decimal_js);
 let zod = require("zod");
 let uuid = require("uuid");
 let drizzle_orm = require("drizzle-orm");
 let xlsx = require("xlsx");
 xlsx = __toESM(xlsx);
 let node_fs_promises = require("node:fs/promises");
-let decimal_js = require("decimal.js");
-decimal_js = __toESM(decimal_js);
 let jszip = require("jszip");
 jszip = __toESM(jszip);
 let node_crypto = require("node:crypto");
@@ -112,7 +112,8 @@ var products = (0, drizzle_orm_sqlite_core.sqliteTable)("products", {
 	createdAt: (0, drizzle_orm_sqlite_core.text)("created_at").notNull(),
 	updatedAt: (0, drizzle_orm_sqlite_core.text)("updated_at").notNull()
 }, (table) => ({
-	nameModelUnique: (0, drizzle_orm_sqlite_core.uniqueIndex)("products_name_model_unique").on(table.nameNormalized, table.modelNormalized),
+	nameModelPriceUnique: (0, drizzle_orm_sqlite_core.uniqueIndex)("products_name_model_price_unique").on(table.nameNormalized, table.modelNormalized, table.unitPriceDecimal),
+	nameModelIdx: (0, drizzle_orm_sqlite_core.index)("products_name_model_idx").on(table.nameNormalized, table.modelNormalized),
 	statusIdx: (0, drizzle_orm_sqlite_core.index)("products_status_idx").on(table.status),
 	stockIdx: (0, drizzle_orm_sqlite_core.index)("products_stock_idx").on(table.stockBalance)
 }));
@@ -294,21 +295,101 @@ var appSettings = (0, drizzle_orm_sqlite_core.sqliteTable)("app_settings", {
 	value: (0, drizzle_orm_sqlite_core.text)("value").notNull()
 });
 //#endregion
+//#region src/shared/money/index.ts
+/**
+* 金额计算工具模块。
+* 所有业务金额计算统一使用 decimal.js，禁止使用 JS Number 浮点直接计算。
+* 金额、税额、价税合计均以「人民币分」整数存储；单价以「含税单价」规范化十进制字符串存储，
+* 计算不含税金额时由 taxExclusiveUnitPrice 反推（含税单价 ÷ 1.13）。
+*/
+decimal_js.default.set({
+	rounding: decimal_js.default.ROUND_HALF_UP,
+	precision: 40
+});
+var TAX_RATE_DECIMAL = "0.13";
+var TAX_RATE_FACTOR = new decimal_js.default("0.13");
+/** 价税合计系数 = 1 + 税率 = 1.13，含税单价 ÷ 该值得不含税单价 */
+var TAX_INCLUSIVE_FACTOR = new decimal_js.default(1).plus(TAX_RATE_FACTOR);
+/**
+* 规范化含税单价字符串：去除首尾空白，去除科学计数法，校验为正数。
+* 小数位数超过 UNIT_PRICE_MAX_DECIMALS（13）位时自动四舍五入到 13 位（而非报错），
+* 避免导入文件因单价精度被整批阻断；单价以十进制字符串存储，无浮点损失。
+* 返回不含前导零的最简十进制字符串（保留有效小数）。
+*/
+function normalizeUnitPrice(input) {
+	const d = new decimal_js.default(String(input).trim());
+	if (!d.isFinite()) throw new Error("单价不是有效数字");
+	if (d.lte(0)) throw new Error("单价必须大于 0");
+	return d.toDecimalPlaces(13, decimal_js.default.ROUND_HALF_UP).toString();
+}
+/**
+* 含税单价 -> 不含税单价（含税单价 ÷ 1.13），四舍五入到 13 位小数。
+* 用于销项导出填入金税模板的「商品单价」列（国税标准为不含税单价），
+* 以及由含税单价计算不含税金额。
+*/
+function taxExclusiveUnitPrice(taxInclusive) {
+	return new decimal_js.default(String(taxInclusive).trim()).div(TAX_INCLUSIVE_FACTOR).toDecimalPlaces(13, decimal_js.default.ROUND_HALF_UP).toString();
+}
+/**
+* 计算不含税金额（分）= 数量 ×（含税单价 ÷ 1.13），四舍五入到 2 位。
+* unitPriceDecimal 为含税单价，内部先经 taxExclusiveUnitPrice 反推不含税单价，
+* 保证「不含税单价 × 数量 = 不含税金额」与金税模板一致。
+*/
+function calcAmountCent(quantity, unitPriceDecimal) {
+	const exclusive = new decimal_js.default(taxExclusiveUnitPrice(unitPriceDecimal));
+	return new decimal_js.default(quantity).times(exclusive).toDecimalPlaces(2, decimal_js.default.ROUND_HALF_UP).times(100).round().toNumber();
+}
+/** 销项开票默认金额系数（金额 = 含税单价 × 系数） */
+var OUTBOUND_AMOUNT_FACTOR = "1.09";
+/**
+* 销项开票金额（分）= 含税单价 × 数量 × 系数，四舍五入到 2 位。
+* 直接按含税单价乘固定系数，不另算税额/价税合计/不含税金额。
+*/
+function calcOutboundAmountCent(quantity, taxInclusiveUnitPrice, factor = OUTBOUND_AMOUNT_FACTOR) {
+	return new decimal_js.default(quantity).times(new decimal_js.default(taxInclusiveUnitPrice)).times(new decimal_js.default(factor)).toDecimalPlaces(2, decimal_js.default.ROUND_HALF_UP).times(100).round().toNumber();
+}
+/** 最终金额（分）按数量反推每件开票单价，保留 13 位小数。 */
+function amountCentToUnitPrice(amountCent, quantity) {
+	if (!Number.isInteger(amountCent) || amountCent <= 0) throw new Error("金额必须为正整数分");
+	if (!Number.isInteger(quantity) || quantity <= 0) throw new Error("数量必须为正整数");
+	return new decimal_js.default(amountCent).div(100).div(quantity).toDecimalPlaces(13, decimal_js.default.ROUND_HALF_UP).toString();
+}
+/** 单价 × 系数（保留 13 位小数），用于销项导出「商品单价」列 = 含税单价 × 系数 */
+function scaleUnitPrice(unitPrice, factor) {
+	return new decimal_js.default(String(unitPrice)).times(new decimal_js.default(factor)).toDecimalPlaces(13, decimal_js.default.ROUND_HALF_UP).toString();
+}
+/**
+* 计算税额（分）= 金额（分）× 13%，四舍五入到 2 位。
+*/
+function calcTaxCent(amountCent) {
+	return new decimal_js.default(amountCent).times(TAX_RATE_FACTOR).toDecimalPlaces(0, decimal_js.default.ROUND_HALF_UP).toNumber();
+}
+/** 价税合计（分）= 金额 + 税额 */
+function calcTotalCent(amountCent, taxCent) {
+	return amountCent + taxCent;
+}
+/** 将分转换为元字符串，保留 2 位小数 */
+function centToYuan(cent) {
+	return new decimal_js.default(cent).div(100).toFixed(2);
+}
+//#endregion
 //#region src/main/db/migrations/legacy-price-version.ts
-/** 将旧版多价格数据合并为商品唯一含税单价和库存。 */
+/** 将旧版价格版本展开为相互独立的商品记录。 */
 function migrateLegacyPriceVersions(db) {
 	if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'price_versions'").get()) return;
 	addProductColumns(db);
 	db.transaction(() => {
-		mergeProductValues(db);
+		db.exec("DROP INDEX IF EXISTS products_name_model_unique");
+		createReferenceMap(db);
+		expandPriceVersions(db);
 		for (const table of [
 			"outbound_lines",
 			"inbound_lines",
 			"replenishment_export_lines",
 			"inventory_ledger"
 		]) migrateReferenceColumn(db, table);
-		rebuildMergedLedgerBalances(db);
 		db.exec("DROP TABLE price_versions");
+		db.exec("DROP TABLE legacy_price_product_map");
 	})();
 }
 /** 为旧商品表增加新模型字段。 */
@@ -319,26 +400,41 @@ function addProductColumns(db) {
 	if (!names.has("tax_rate")) db.exec("ALTER TABLE products ADD COLUMN tax_rate INTEGER NOT NULL DEFAULT 13");
 	if (!names.has("stock_balance")) db.exec("ALTER TABLE products ADD COLUMN stock_balance INTEGER NOT NULL DEFAULT 0");
 }
-/** 选取最近启用价格，并合并同商品的全部库存。 */
-function mergeProductValues(db) {
+/** 创建价格版本到新商品 ID 的临时映射。 */
+function createReferenceMap(db) {
 	db.exec(`
-    UPDATE products
-    SET unit_price_decimal = COALESCE((
-          SELECT unit_price_decimal FROM price_versions
-          WHERE product_id = products.id
-          ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, updated_at DESC, id DESC LIMIT 1
-        ), unit_price_decimal),
-        tax_rate = COALESCE((
-          SELECT tax_rate FROM price_versions
-          WHERE product_id = products.id
-          ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, updated_at DESC, id DESC LIMIT 1
-        ), tax_rate),
-        stock_balance = COALESCE((
-          SELECT SUM(stock_balance) FROM price_versions WHERE product_id = products.id
-        ), 0)
+    CREATE TEMP TABLE legacy_price_product_map (
+      price_version_id TEXT PRIMARY KEY NOT NULL,
+      product_id TEXT NOT NULL
+    )
   `);
 }
-/** 把历史表的旧外键转换为商品外键。 */
+/** 将每个旧价格版本转换为独立商品，并保留首个版本的原商品 ID。 */
+function expandPriceVersions(db) {
+	const products = db.prepare("SELECT * FROM products ORDER BY created_at, id").all();
+	const versionsQuery = db.prepare(`
+    SELECT * FROM price_versions WHERE product_id = ? ORDER BY created_at, id
+  `);
+	const insertMap = db.prepare("INSERT INTO legacy_price_product_map VALUES (?, ?)");
+	const updateProduct = db.prepare(`
+    UPDATE products SET unit_price_decimal = ?, tax_rate = ?, stock_balance = ?, status = ?, updated_at = ?
+    WHERE id = ?
+  `);
+	const insertProduct = db.prepare(`
+    INSERT INTO products (
+      id, name, name_normalized, model, model_normalized, unit, tax_classification_code,
+      unit_price_decimal, tax_rate, stock_balance, data_status, status, remark, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+	for (const product of products) versionsQuery.all(product.id).forEach((version, index) => {
+		const targetId = index === 0 ? product.id : version.id;
+		const status = product.status === "inactive" || version.status === "inactive" ? "inactive" : "active";
+		if (index === 0) updateProduct.run(version.unit_price_decimal, version.tax_rate, version.stock_balance, status, version.updated_at, targetId);
+		else insertProduct.run(targetId, product.name, product.name_normalized, product.model, product.model_normalized, product.unit, product.tax_classification_code, version.unit_price_decimal, version.tax_rate, version.stock_balance, product.data_status, status, product.remark, version.created_at, version.updated_at);
+		insertMap.run(version.id, targetId);
+	});
+}
+/** 把历史表的价格版本外键转换为独立商品外键。 */
 function migrateReferenceColumn(db, table) {
 	if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table)) return;
 	if (!db.prepare(`PRAGMA table_info(${table})`).all().some((column) => column.name === "price_version_id")) return;
@@ -346,27 +442,12 @@ function migrateReferenceColumn(db, table) {
 	for (const index of indexes) if (index.name.includes("price_version")) db.exec(`DROP INDEX IF EXISTS "${index.name}"`);
 	db.exec(`
     UPDATE ${table}
-    SET price_version_id = COALESCE(
-      (SELECT product_id FROM price_versions WHERE id = ${table}.price_version_id),
-      price_version_id
-    );
+    SET price_version_id = COALESCE((
+      SELECT product_id FROM legacy_price_product_map
+      WHERE price_version_id = ${table}.price_version_id
+    ), price_version_id);
     ALTER TABLE ${table} RENAME COLUMN price_version_id TO product_id;
   `);
-}
-/** 按时间重算合并后的商品级流水余额。 */
-function rebuildMergedLedgerBalances(db) {
-	if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'inventory_ledger'").get()) return;
-	const rows = db.prepare(`
-    SELECT id, product_id, change_quantity FROM inventory_ledger ORDER BY created_at, id
-  `).all();
-	const balances = /* @__PURE__ */ new Map();
-	const update = db.prepare("UPDATE inventory_ledger SET balance_before = ?, balance_after = ? WHERE id = ?");
-	for (const row of rows) {
-		const before = balances.get(row.product_id) ?? 0;
-		const after = before + row.change_quantity;
-		update.run(before, after, row.id);
-		balances.set(row.product_id, after);
-	}
 }
 //#endregion
 //#region src/main/db/migrations/initial-schema.ts
@@ -379,6 +460,26 @@ function rebuildMergedLedgerBalances(db) {
 function runMigrations(db) {
 	migrateLegacyPriceVersions(db);
 	db.exec(MIGRATION_SQL);
+	normalizeProductPrices(db);
+	createProductIndexes(db);
+}
+/** 将历史商品价格统一转换为唯一索引使用的规范化十进制字符串。 */
+function normalizeProductPrices(db) {
+	const rows = db.prepare("SELECT id, unit_price_decimal FROM products").all();
+	const update = db.prepare("UPDATE products SET unit_price_decimal = ? WHERE id = ?");
+	for (const row of rows) {
+		if (row.unit_price_decimal === "0") continue;
+		update.run(normalizeUnitPrice(row.unit_price_decimal), row.id);
+	}
+}
+/** 用名称、型号和规范化价格建立商品唯一约束。 */
+function createProductIndexes(db) {
+	db.exec(`
+    DROP INDEX IF EXISTS products_name_model_unique;
+    CREATE UNIQUE INDEX IF NOT EXISTS products_name_model_price_unique
+      ON products(name_normalized, model_normalized, unit_price_decimal);
+    CREATE INDEX IF NOT EXISTS products_name_model_idx ON products(name_normalized, model_normalized);
+  `);
 }
 var MIGRATION_SQL = `
   CREATE TABLE IF NOT EXISTS customers (
@@ -419,7 +520,6 @@ var MIGRATION_SQL = `
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
-  CREATE UNIQUE INDEX IF NOT EXISTS products_name_model_unique ON products(name_normalized, model_normalized);
   CREATE INDEX IF NOT EXISTS products_status_idx ON products(status);
   CREATE INDEX IF NOT EXISTS products_stock_idx ON products(stock_balance);
 
@@ -2435,89 +2535,12 @@ function getStockSummary() {
 	};
 }
 //#endregion
-//#region src/shared/money/index.ts
-/**
-* 金额计算工具模块。
-* 所有业务金额计算统一使用 decimal.js，禁止使用 JS Number 浮点直接计算。
-* 金额、税额、价税合计均以「人民币分」整数存储；单价以「含税单价」规范化十进制字符串存储，
-* 计算不含税金额时由 taxExclusiveUnitPrice 反推（含税单价 ÷ 1.13）。
-*/
-decimal_js.default.set({
-	rounding: decimal_js.default.ROUND_HALF_UP,
-	precision: 40
-});
-var TAX_RATE_DECIMAL = "0.13";
-var TAX_RATE_FACTOR = new decimal_js.default("0.13");
-/** 价税合计系数 = 1 + 税率 = 1.13，含税单价 ÷ 该值得不含税单价 */
-var TAX_INCLUSIVE_FACTOR = new decimal_js.default(1).plus(TAX_RATE_FACTOR);
-/**
-* 规范化含税单价字符串：去除首尾空白，去除科学计数法，校验为正数。
-* 小数位数超过 UNIT_PRICE_MAX_DECIMALS（13）位时自动四舍五入到 13 位（而非报错），
-* 避免导入文件因单价精度被整批阻断；单价以十进制字符串存储，无浮点损失。
-* 返回不含前导零的最简十进制字符串（保留有效小数）。
-*/
-function normalizeUnitPrice(input) {
-	const d = new decimal_js.default(String(input).trim());
-	if (!d.isFinite()) throw new Error("单价不是有效数字");
-	if (d.lte(0)) throw new Error("单价必须大于 0");
-	return d.toDecimalPlaces(13, decimal_js.default.ROUND_HALF_UP).toString();
-}
-/**
-* 含税单价 -> 不含税单价（含税单价 ÷ 1.13），四舍五入到 13 位小数。
-* 用于销项导出填入金税模板的「商品单价」列（国税标准为不含税单价），
-* 以及由含税单价计算不含税金额。
-*/
-function taxExclusiveUnitPrice(taxInclusive) {
-	return new decimal_js.default(String(taxInclusive).trim()).div(TAX_INCLUSIVE_FACTOR).toDecimalPlaces(13, decimal_js.default.ROUND_HALF_UP).toString();
-}
-/**
-* 计算不含税金额（分）= 数量 ×（含税单价 ÷ 1.13），四舍五入到 2 位。
-* unitPriceDecimal 为含税单价，内部先经 taxExclusiveUnitPrice 反推不含税单价，
-* 保证「不含税单价 × 数量 = 不含税金额」与金税模板一致。
-*/
-function calcAmountCent(quantity, unitPriceDecimal) {
-	const exclusive = new decimal_js.default(taxExclusiveUnitPrice(unitPriceDecimal));
-	return new decimal_js.default(quantity).times(exclusive).toDecimalPlaces(2, decimal_js.default.ROUND_HALF_UP).times(100).round().toNumber();
-}
-/** 销项开票默认金额系数（金额 = 含税单价 × 系数） */
-var OUTBOUND_AMOUNT_FACTOR = "1.09";
-/**
-* 销项开票金额（分）= 含税单价 × 数量 × 系数，四舍五入到 2 位。
-* 直接按含税单价乘固定系数，不另算税额/价税合计/不含税金额。
-*/
-function calcOutboundAmountCent(quantity, taxInclusiveUnitPrice, factor = OUTBOUND_AMOUNT_FACTOR) {
-	return new decimal_js.default(quantity).times(new decimal_js.default(taxInclusiveUnitPrice)).times(new decimal_js.default(factor)).toDecimalPlaces(2, decimal_js.default.ROUND_HALF_UP).times(100).round().toNumber();
-}
-/** 最终金额（分）按数量反推每件开票单价，保留 13 位小数。 */
-function amountCentToUnitPrice(amountCent, quantity) {
-	if (!Number.isInteger(amountCent) || amountCent <= 0) throw new Error("金额必须为正整数分");
-	if (!Number.isInteger(quantity) || quantity <= 0) throw new Error("数量必须为正整数");
-	return new decimal_js.default(amountCent).div(100).div(quantity).toDecimalPlaces(13, decimal_js.default.ROUND_HALF_UP).toString();
-}
-/** 单价 × 系数（保留 13 位小数），用于销项导出「商品单价」列 = 含税单价 × 系数 */
-function scaleUnitPrice(unitPrice, factor) {
-	return new decimal_js.default(String(unitPrice)).times(new decimal_js.default(factor)).toDecimalPlaces(13, decimal_js.default.ROUND_HALF_UP).toString();
-}
-/**
-* 计算税额（分）= 金额（分）× 13%，四舍五入到 2 位。
-*/
-function calcTaxCent(amountCent) {
-	return new decimal_js.default(amountCent).times(TAX_RATE_FACTOR).toDecimalPlaces(0, decimal_js.default.ROUND_HALF_UP).toNumber();
-}
-/** 价税合计（分）= 金额 + 税额 */
-function calcTotalCent(amountCent, taxCent) {
-	return amountCent + taxCent;
-}
-/** 将分转换为元字符串，保留 2 位小数 */
-function centToYuan(cent) {
-	return new decimal_js.default(cent).div(100).toFixed(2);
-}
-//#endregion
 //#region src/main/domains/catalog/catalog-crud.ts
-/** 新增只有一个可修改含税单价的商品。 */
+/** 新增商品，同名同型号可按不同含税单价分别建档。 */
 function createProduct(input) {
 	const { nameNorm, modelNorm } = normalizeProductKeys(input.name, input.model);
-	ensureProductUnique(nameNorm, modelNorm);
+	const unitPriceDecimal = normalizeUnitPrice(input.unitPriceDecimal);
+	ensureProductUnique(nameNorm, modelNorm, unitPriceDecimal);
 	const id = (0, uuid.v7)();
 	const now = (/* @__PURE__ */ new Date()).toISOString();
 	const taxCode = trimInvisible(input.taxClassificationCode);
@@ -2529,7 +2552,7 @@ function createProduct(input) {
 		modelNormalized: modelNorm,
 		unit: trimInvisible(input.unit),
 		taxClassificationCode: taxCode,
-		unitPriceDecimal: normalizeUnitPrice(input.unitPriceDecimal),
+		unitPriceDecimal,
 		taxRate: input.taxRate ?? 13,
 		stockBalance: 0,
 		dataStatus: taxCode ? "complete" : "incomplete",
@@ -2547,13 +2570,14 @@ function createProduct(input) {
 	markDirty();
 	return getProductById(id);
 }
-/** 编辑商品资料及当前含税单价。 */
+/** 编辑商品资料及其独立含税单价。 */
 function updateProduct(input) {
 	if (!input.id) throw new Error("商品 ID 必填");
 	const old = getProductById(input.id);
 	if (!old) throw new Error("商品不存在");
 	const { nameNorm, modelNorm } = normalizeProductKeys(input.name, input.model);
-	ensureProductUnique(nameNorm, modelNorm, input.id);
+	const unitPriceDecimal = normalizeUnitPrice(input.unitPriceDecimal);
+	ensureProductUnique(nameNorm, modelNorm, unitPriceDecimal, input.id);
 	const taxCode = trimInvisible(input.taxClassificationCode);
 	const updates = {
 		name: trimInvisible(input.name),
@@ -2562,7 +2586,7 @@ function updateProduct(input) {
 		modelNormalized: modelNorm,
 		unit: trimInvisible(input.unit),
 		taxClassificationCode: taxCode,
-		unitPriceDecimal: normalizeUnitPrice(input.unitPriceDecimal),
+		unitPriceDecimal,
 		taxRate: input.taxRate ?? 13,
 		dataStatus: taxCode ? "complete" : "incomplete",
 		status: input.status ?? "active",
@@ -2610,9 +2634,15 @@ function normalizeProductKeys(name, model) {
 		modelNorm: normalizeKey(model)
 	};
 }
-/** 校验项目名称和规格型号唯一。 */
-function ensureProductUnique(nameNorm, modelNorm, excludeId) {
-	if (excludeId ? getRawDb().prepare("SELECT id FROM products WHERE name_normalized = ? AND model_normalized = ? AND id != ?").get(nameNorm, modelNorm, excludeId) : getRawDb().prepare("SELECT id FROM products WHERE name_normalized = ? AND model_normalized = ?").get(nameNorm, modelNorm)) throw new Error("该项目名称和规格型号已存在");
+/** 校验规范化名称、型号和含税单价组合唯一。 */
+function ensureProductUnique(nameNorm, modelNorm, unitPriceDecimal, excludeId) {
+	if (excludeId ? getRawDb().prepare(`
+        SELECT id FROM products
+        WHERE name_normalized = ? AND model_normalized = ? AND unit_price_decimal = ? AND id != ?
+      `).get(nameNorm, modelNorm, unitPriceDecimal, excludeId) : getRawDb().prepare(`
+        SELECT id FROM products
+        WHERE name_normalized = ? AND model_normalized = ? AND unit_price_decimal = ?
+      `).get(nameNorm, modelNorm, unitPriceDecimal)) throw new Error("该项目名称、规格型号和含税单价组合已存在");
 }
 /** 生成商品字段审计差异。 */
 function buildProductDeltas(old, updates) {
@@ -2687,9 +2717,11 @@ function buildDailyImportPreview(rawRows) {
 function buildPreview(rawRows, isInitial) {
 	const rows = [];
 	const errors = [];
-	const seenProductKeys = /* @__PURE__ */ new Map();
+	const seenPriceKeys = /* @__PURE__ */ new Map();
+	const acceptedProductKeys = /* @__PURE__ */ new Set();
+	const productMetadata = /* @__PURE__ */ new Map();
 	let newProductCount = 0;
-	let updatedProductCount = 0;
+	let newPriceVariantCount = 0;
 	let totalStockSum = 0;
 	let dedupedRowCount = 0;
 	for (const raw of rawRows) {
@@ -2710,12 +2742,36 @@ function buildPreview(rawRows, isInitial) {
 		const modelNorm = normalizeKey(row.model);
 		const unitPriceNormalized = row.unitPriceDecimal ? normalizeUnitPriceSafe$1(row.unitPriceDecimal) : "";
 		const productKey = `${nameNorm}|${modelNorm}`;
-		if (rowErrors.length === 0 && seenProductKeys.has(productKey)) {
+		const priceKey = `${productKey}|${unitPriceNormalized}`;
+		if (rowErrors.length === 0 && seenPriceKeys.has(priceKey)) {
 			row.deduped = true;
-			row.errors = [`与第 ${seenProductKeys.get(productKey)} 行商品重复，已自动去重`];
+			row.errors = [`与第 ${seenPriceKeys.get(priceKey)} 行商品和价格重复，已自动去重`];
 			dedupedRowCount++;
-		} else if (rowErrors.length === 0) seenProductKeys.set(productKey, raw.rowIndex);
+		} else if (rowErrors.length === 0) seenPriceKeys.set(priceKey, raw.rowIndex);
 		if (rowErrors.length === 0 && !row.deduped) {
+			const metadata = {
+				unit: trimInvisible(row.unit),
+				taxCode: trimInvisible(row.taxClassificationCode)
+			};
+			const knownMetadata = productMetadata.get(productKey);
+			if (knownMetadata && knownMetadata.unit !== metadata.unit) {
+				const error = `单位与同文件商品不一致（已有: ${knownMetadata.unit}）`;
+				row.errors.push(error);
+				errors.push({
+					rowIndex: raw.rowIndex,
+					field: "",
+					reason: error
+				});
+			}
+			if (knownMetadata && knownMetadata.taxCode !== metadata.taxCode) {
+				const error = "税收分类编码与同文件商品不一致";
+				row.errors.push(error);
+				errors.push({
+					rowIndex: raw.rowIndex,
+					field: "",
+					reason: error
+				});
+			}
 			const dbCheck = checkDatabaseConflict(row, nameNorm, modelNorm, unitPriceNormalized, isInitial);
 			dbCheck.errors.forEach((e) => {
 				row.errors.push(e);
@@ -2725,9 +2781,13 @@ function buildPreview(rawRows, isInitial) {
 					reason: e
 				});
 			});
-			if (dbCheck.isNewProduct) newProductCount++;
-			if (dbCheck.priceChanged) updatedProductCount++;
-			if (isInitial && row.initialStock != null) totalStockSum += row.initialStock;
+			if (dbCheck.errors.length === 0 && row.errors.length === 0) {
+				if (dbCheck.hasExistingNameModel || acceptedProductKeys.has(productKey)) newPriceVariantCount++;
+				else newProductCount++;
+				acceptedProductKeys.add(productKey);
+				productMetadata.set(productKey, metadata);
+				if (isInitial && row.initialStock != null) totalStockSum += row.initialStock;
+			}
 		}
 		rows.push(row);
 	}
@@ -2735,7 +2795,7 @@ function buildPreview(rawRows, isInitial) {
 	return {
 		rows,
 		newProductCount,
-		updatedProductCount,
+		newPriceVariantCount,
 		totalStockSum: isInitial ? totalStockSum : 0,
 		errorCount,
 		dedupedRowCount,
@@ -2747,24 +2807,21 @@ function buildPreview(rawRows, isInitial) {
 /** 检查与数据库已有商品的冲突 */
 function checkDatabaseConflict(row, nameNorm, modelNorm, unitPriceNormalized, isInitial) {
 	const errors = [];
-	let isNewProduct = false;
-	let priceChanged = false;
-	const existingProduct = getRawDb().prepare("SELECT id, unit, tax_classification_code, unit_price_decimal FROM products WHERE name_normalized = ? AND model_normalized = ?").get(nameNorm, modelNorm);
-	if (existingProduct) {
-		if (!isInitial && existingProduct.unit !== trimInvisible(row.unit)) errors.push(`单位与已有商品不一致（已有: ${existingProduct.unit}）`);
-		if (!isInitial && existingProduct.tax_classification_code !== trimInvisible(row.taxClassificationCode)) errors.push("税收分类编码与已有商品不一致");
-		if (isInitial) errors.push("该商品已存在");
-		priceChanged = existingProduct.unit_price_decimal !== unitPriceNormalized;
-	} else isNewProduct = true;
+	const existingProducts = getRawDb().prepare("SELECT id, unit, tax_classification_code, unit_price_decimal FROM products WHERE name_normalized = ? AND model_normalized = ?").all(nameNorm, modelNorm);
+	if (existingProducts.length > 0) {
+		const metadataProduct = existingProducts[0];
+		if (metadataProduct.unit !== trimInvisible(row.unit)) errors.push(`单位与已有商品不一致（已有: ${metadataProduct.unit}）`);
+		if (metadataProduct.tax_classification_code !== trimInvisible(row.taxClassificationCode)) errors.push("税收分类编码与已有商品不一致");
+		if (existingProducts.some((product) => product.unit_price_decimal === unitPriceNormalized)) errors.push(isInitial ? "该商品和含税单价已存在" : "该商品和含税单价已存在，日常导入不允许重复");
+	}
 	return {
 		errors,
-		isNewProduct,
-		priceChanged
+		hasExistingNameModel: existingProducts.length > 0
 	};
 }
 //#endregion
 //#region src/main/domains/catalog/catalog-import-confirm.ts
-/** 首次导入商品、唯一含税单价和初始库存。 */
+/** 首次导入名称型号价格唯一的商品及其初始库存。 */
 function confirmInitialImport(token) {
 	if (getInitStatus().productInitialImportDone) throw new Error("商品首次导入已完成，不能重复执行");
 	const preview = requirePreview(token);
@@ -2778,7 +2835,7 @@ function confirmInitialImport(token) {
 	deleteCachedPreview(token);
 	return result;
 }
-/** 日常导入新增商品，或更新已有商品的当前含税单价。 */
+/** 日常导入新增商品记录，不覆盖已有商品价格或库存。 */
 function confirmDailyImport(token) {
 	if (!getInitStatus().productInitialImportDone) throw new Error("商品首次导入尚未完成，不能执行日常导入");
 	const result = writeRows(requirePreview(token).rows, false, (0, uuid.v7)());
@@ -2794,45 +2851,45 @@ function requirePreview(token) {
 }
 /** 在单个事务中写入商品导入行。 */
 function writeRows(rows, isInitial, batchId) {
-	let productCount = 0;
-	let updatedProducts = 0;
+	let createdCount = 0;
+	let newProductCount = 0;
+	let newPriceVariantCount = 0;
 	const validRows = rows.filter((row) => row.errors.length === 0 && !row.deduped);
 	getRawDb().transaction(() => {
 		for (const row of validRows) {
-			const existing = findProduct(row);
-			if (existing) {
-				updateImportedProduct(existing.id, row);
-				updatedProducts++;
-			} else {
-				const productId = insertProduct(row, isInitial ? row.initialStock ?? 0 : 0);
-				productCount++;
-				if (isInitial && (row.initialStock ?? 0) !== 0) appendLedger({
-					productId,
-					changeQuantity: row.initialStock ?? 0,
-					balanceBefore: 0,
-					sourceType: "initialization",
-					sourceId: batchId,
-					reason: "首次导入初始库存"
-				});
-				recordAudit({
-					action: isInitial ? "catalog.initial_import" : "catalog.daily_import",
-					entityType: "product",
-					entityId: productId,
-					sourceBatchId: batchId,
-					summary: `${isInitial ? "首次" : "日常"}导入: ${row.name} ${row.model} @ ${row.unitPriceDecimal}`
-				});
-			}
+			const hasNameModel = hasProductGroup(row);
+			const productId = insertProduct(row, isInitial ? row.initialStock ?? 0 : 0);
+			createdCount++;
+			if (hasNameModel) newPriceVariantCount++;
+			else newProductCount++;
+			if (isInitial && (row.initialStock ?? 0) !== 0) appendLedger({
+				productId,
+				changeQuantity: row.initialStock ?? 0,
+				balanceBefore: 0,
+				sourceType: "initialization",
+				sourceId: batchId,
+				reason: "首次导入初始库存"
+			});
+			recordAudit({
+				action: isInitial ? "catalog.initial_import" : "catalog.daily_import",
+				entityType: "product",
+				entityId: productId,
+				sourceBatchId: batchId,
+				summary: `${isInitial ? "首次" : "日常"}导入: ${row.name} ${row.model} @ ${row.unitPriceDecimal}`
+			});
 		}
 		markDirty();
 	})();
 	return {
-		products: productCount,
-		updatedProducts
+		createdCount,
+		newProductCount,
+		newPriceVariantCount
 	};
 }
-/** 查找同名同型号商品。 */
-function findProduct(row) {
-	return getRawDb().prepare("SELECT id FROM products WHERE name_normalized = ? AND model_normalized = ?").get(normalizeKey(row.name), normalizeKey(row.model));
+/** 判断名称和型号组合是否已有任一价格商品。 */
+function hasProductGroup(row) {
+	const existing = getRawDb().prepare("SELECT id FROM products WHERE name_normalized = ? AND model_normalized = ?").get(normalizeKey(row.name), normalizeKey(row.model));
+	return Boolean(existing);
 }
 /** 新增导入商品。 */
 function insertProduct(row, stockBalance) {
@@ -2856,22 +2913,6 @@ function insertProduct(row, stockBalance) {
 		updatedAt: now
 	}).run();
 	return productId;
-}
-/** 更新日常导入商品的资料和当前含税单价。 */
-function updateImportedProduct(productId, row) {
-	getDb().update(products).set({
-		unit: trimInvisible(row.unit),
-		taxClassificationCode: trimInvisible(row.taxClassificationCode),
-		unitPriceDecimal: normalizeUnitPrice(row.unitPriceDecimal),
-		remark: row.remark ? trimInvisible(row.remark) : null,
-		updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-	}).where((0, drizzle_orm.eq)(products.id, productId)).run();
-	recordAudit({
-		action: "catalog.daily_import",
-		entityType: "product",
-		entityId: productId,
-		summary: `日常导入更新含税单价: ${row.name} @ ${row.unitPriceDecimal}`
-	});
 }
 //#endregion
 //#region src/main/ipc/catalog-ipc.ts
@@ -3930,7 +3971,7 @@ function aggregateRows(rawRows) {
 	}
 	return aggregatedMap;
 }
-/** 匹配已有商品，并识别当前含税单价是否变化。 */
+/** 按名称、型号和规范化含税单价精确匹配已有商品。 */
 function matchExistingProduct(name, model, unit, price, quantity) {
 	const raw = getRawDb();
 	const nameNorm = normalizeKey(name);
@@ -3938,21 +3979,23 @@ function matchExistingProduct(name, model, unit, price, quantity) {
 	const result = {
 		isNewProduct: false,
 		productId: null,
-		priceChanged: false,
 		matched: false,
 		errors: [],
-		newProductCount: 0,
-		updatedProductCount: 0
+		newProductCount: 0
 	};
-	const existingProduct = raw.prepare("SELECT id, unit, unit_price_decimal, stock_balance FROM products WHERE name_normalized = ? AND model_normalized = ?").get(nameNorm, modelNorm);
+	const existingProduct = raw.prepare(`
+    SELECT id, unit, unit_price_decimal, stock_balance FROM products
+    WHERE name_normalized = ? AND model_normalized = ? AND unit_price_decimal = ?
+  `).get(nameNorm, modelNorm, price);
 	if (existingProduct) {
 		result.productId = existingProduct.id;
 		if (existingProduct.unit !== unit) result.errors.push(`单位不一致（已有: ${existingProduct.unit}，导入: ${unit}）`);
 		result.matched = true;
-		result.priceChanged = existingProduct.unit_price_decimal !== price;
-		if (result.priceChanged) result.updatedProductCount = 1;
 		if (existingProduct.stock_balance < 0 && quantity > Math.abs(existingProduct.stock_balance)) result.errors.push(`当前库存 ${existingProduct.stock_balance}，导入数量 ${quantity} 超过待补数量 ${Math.abs(existingProduct.stock_balance)}`);
-	} else {
+	} else if (raw.prepare(`
+      SELECT id FROM products WHERE name_normalized = ? AND model_normalized = ? LIMIT 1
+    `).get(nameNorm, modelNorm)) result.errors.push(`含税单价 ${price} 尚未建档，请先通过商品日常导入新增该价格商品`);
+	else {
 		result.isNewProduct = true;
 		result.newProductCount = 1;
 		result.matched = true;
@@ -4000,13 +4043,11 @@ function buildInboundPreview(rawRows, fileSha256) {
 		const price = r.unitPriceDecimal ? normalizeUnitPriceSafe(r.unitPriceDecimal) : "";
 		return !isNonInventoryExpenseRow(model, unit, r.quantity) && validateRowFields(trimInvisible(r.name), model, unit, price, r.quantity).length === 0;
 	}));
-	const pricesByProduct = collectProductPrices(aggregatedMap);
 	let totalQuantity = 0;
 	let totalAmountCent = 0;
 	let totalTaxCent = 0;
 	let totalCent = 0;
 	let newProductCount = 0;
-	let updatedProductCount = 0;
 	for (const [, entry] of aggregatedMap) {
 		const raw = entry.firstRow;
 		const name = trimInvisible(raw.name);
@@ -4022,9 +4063,7 @@ function buildInboundPreview(rawRows, fileSha256) {
 		totalTaxCent += taxCent;
 		totalCent += totalLine;
 		const match = matchExistingProduct(name, model, unit, price, quantity);
-		if ((pricesByProduct.get(`${normalizeKey(name)}|${normalizeKey(model)}`)?.size ?? 0) > 1) match.errors.push("同一商品在本次导入中存在多个含税单价，请统一后重新导入");
 		newProductCount += match.newProductCount;
-		updatedProductCount += match.updatedProductCount;
 		if (match.errors.length > 0) for (const e of match.errors) errors.push({
 			sourceSheet: raw.sourceSheet,
 			sourceRow: raw.sourceRow,
@@ -4047,7 +4086,6 @@ function buildInboundPreview(rawRows, fileSha256) {
 			totalCent: totalLine,
 			isNewProduct: match.isNewProduct,
 			productId: match.productId,
-			priceChanged: match.priceChanged,
 			matched: match.matched,
 			errors: match.errors
 		});
@@ -4071,20 +4109,8 @@ function buildInboundPreview(rawRows, fileSha256) {
 		totalAmountCent: hasErrors ? 0 : totalAmountCent,
 		totalTaxCent: hasErrors ? 0 : totalTaxCent,
 		totalCent: hasErrors ? 0 : totalCent,
-		newProductCount,
-		updatedProductCount
+		newProductCount
 	};
-}
-/** 收集本次导入中每个商品出现的含税单价。 */
-function collectProductPrices(aggregated) {
-	const result = /* @__PURE__ */ new Map();
-	for (const { firstRow } of aggregated.values()) {
-		const key = `${normalizeKey(firstRow.name)}|${normalizeKey(firstRow.model)}`;
-		const prices = result.get(key) ?? /* @__PURE__ */ new Set();
-		prices.add(normalizeUnitPriceSafe(firstRow.unitPriceDecimal));
-		result.set(key, prices);
-	}
-	return result;
 }
 /** 构建错误行 */
 function buildErrorLine(raw, name, model, unit, price, errors) {
@@ -4104,7 +4130,6 @@ function buildErrorLine(raw, name, model, unit, price, errors) {
 		totalCent: 0,
 		isNewProduct: false,
 		productId: null,
-		priceChanged: false,
 		matched: false,
 		errors
 	};
@@ -4177,7 +4202,7 @@ function insertInboundBatch(db, batchId, batchNo, fileName, fileBase64, result) 
 		totalCent: result.totalCent
 	}).run();
 }
-/** 处理单行进项：自动建档或更新含税单价，再写明细和库存流水。 */
+/** 处理单行进项：自动建档或匹配精确价格，再写明细和库存流水。 */
 function processInboundLine(db, raw, batchId, batchNo, line) {
 	let productId = line.productId;
 	if (line.isNewProduct && !productId) productId = createAutoProduct(db, batchId, line);
@@ -4210,7 +4235,6 @@ function processInboundLine(db, raw, batchId, batchNo, line) {
 		reason: `月初进项导入 ${batchNo}`
 	});
 	db.update(products).set({
-		unitPriceDecimal: line.unitPriceDecimal,
 		stockBalance: balanceAfter,
 		updatedAt: (/* @__PURE__ */ new Date()).toISOString()
 	}).where((0, drizzle_orm.eq)(products.id, productId)).run();

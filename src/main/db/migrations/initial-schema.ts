@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { normalizeUnitPrice } from '@shared/money/index';
 import { migrateLegacyPriceVersions } from './legacy-price-version';
 
 /**
@@ -11,6 +12,31 @@ import { migrateLegacyPriceVersions } from './legacy-price-version';
 export function runMigrations(db: Database.Database): void {
   migrateLegacyPriceVersions(db);
   db.exec(MIGRATION_SQL);
+  normalizeProductPrices(db);
+  createProductIndexes(db);
+}
+
+/** 将历史商品价格统一转换为唯一索引使用的规范化十进制字符串。 */
+function normalizeProductPrices(db: Database.Database): void {
+  const rows = db.prepare('SELECT id, unit_price_decimal FROM products').all() as Array<{
+    id: string;
+    unit_price_decimal: string;
+  }>;
+  const update = db.prepare('UPDATE products SET unit_price_decimal = ? WHERE id = ?');
+  for (const row of rows) {
+    if (row.unit_price_decimal === '0') continue;
+    update.run(normalizeUnitPrice(row.unit_price_decimal), row.id);
+  }
+}
+
+/** 用名称、型号和规范化价格建立商品唯一约束。 */
+function createProductIndexes(db: Database.Database): void {
+  db.exec(`
+    DROP INDEX IF EXISTS products_name_model_unique;
+    CREATE UNIQUE INDEX IF NOT EXISTS products_name_model_price_unique
+      ON products(name_normalized, model_normalized, unit_price_decimal);
+    CREATE INDEX IF NOT EXISTS products_name_model_idx ON products(name_normalized, model_normalized);
+  `);
 }
 
 const MIGRATION_SQL = `
@@ -52,7 +78,6 @@ const MIGRATION_SQL = `
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
-  CREATE UNIQUE INDEX IF NOT EXISTS products_name_model_unique ON products(name_normalized, model_normalized);
   CREATE INDEX IF NOT EXISTS products_status_idx ON products(status);
   CREATE INDEX IF NOT EXISTS products_stock_idx ON products(stock_balance);
 

@@ -76397,7 +76397,7 @@ function formatTime$3(iso) {
 		return iso;
 	}
 }
-function InventoryTable({ rows, loading, page, pageSize, total, onViewHistory, onEditProduct, onDeleteProduct, onPageChange, onSizeChange, onQuantityChange }) {
+function InventoryTable({ rows, loading, page, pageSize, total, onViewHistory, onEditProduct, onDeleteProduct, onPageChange, onSizeChange, onQuantityChange, toolbar }) {
 	const selectionStore = useSelectionStore();
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SharedTable, {
 		rowKey: "id",
@@ -76502,7 +76502,47 @@ function InventoryTable({ rows, loading, page, pageSize, total, onViewHistory, o
 		pageSize,
 		total,
 		onPageChange,
-		onSizeChange
+		onSizeChange,
+		toolbar
+	});
+}
+//#endregion
+//#region src/renderer/pages/inventory/components/InventorySummaryBar.tsx
+/** 在库存表格首行展示当前选择金额及正负库存汇总。 */
+function InventorySummaryBar({ selectedAmountCent, stockSummary }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		"data-testid": "inventory-summary-bar",
+		className: "mb-2 flex min-h-12 flex-wrap items-center gap-x-8 gap-y-2 rounded-lg border border-line border-l-4 border-l-brand bg-white px-4 py-2",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SummaryMetric, {
+				label: "总已选金额",
+				value: `¥${centToDisplay$1(selectedAmountCent)}`,
+				valueClass: "text-brand"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SummaryMetric, {
+				label: "总库存（正数）",
+				value: stockSummary?.positiveStock ?? "—",
+				valueClass: "text-green-600"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SummaryMetric, {
+				label: "总负库存",
+				value: stockSummary?.negativeStock ?? "—",
+				valueClass: "text-red-500"
+			})
+		]
+	});
+}
+/** 渲染紧凑、可换行的单项统计指标。 */
+function SummaryMetric({ label, value, valueClass }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "flex items-baseline gap-2 whitespace-nowrap",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			className: "text-xs text-muted",
+			children: label
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+			className: `text-base tabular-nums ${valueClass}`,
+			children: value
+		})]
 	});
 }
 //#endregion
@@ -77324,58 +77364,60 @@ function ReplenishmentExportDialog({ open, onClose, onExported }) {
 //#endregion
 //#region src/renderer/pages/inventory/components/ExcelImportStep.tsx
 var { Text } = Typography;
-function ExcelImportStep({ open, title, templateName, onDownloadTemplate, onPreview, onConfirm, confirmText = "确认导入", onClose }) {
+/** 提供“选择、校验、确认、完成”四阶段的通用 Excel 导入流程。 */
+function ExcelImportStep({ open, title, templateName, onDownloadTemplate, onPreview, onConfirm, renderPreview, renderConfirmation, renderCompletion, confirmText = "确认导入", width = 560, onClose }) {
 	const { message } = App$1.useApp();
 	const [step, setStep] = (0, import_react.useState)(0);
 	const [filePath, setFilePath] = (0, import_react.useState)(null);
-	const [token, setToken] = (0, import_react.useState)(null);
-	const [previewMsg, setPreviewMsg] = (0, import_react.useState)(null);
-	const [previewOk, setPreviewOk] = (0, import_react.useState)(false);
+	const [previewResponse, setPreviewResponse] = (0, import_react.useState)(null);
+	const [confirmResult, setConfirmResult] = (0, import_react.useState)(null);
 	const [busy, setBusy] = (0, import_react.useState)(false);
+	/** 清空本轮导入产生的文件、令牌和结果状态。 */
 	const reset = () => {
 		setStep(0);
 		setFilePath(null);
-		setToken(null);
-		setPreviewMsg(null);
-		setPreviewOk(false);
+		setPreviewResponse(null);
+		setConfirmResult(null);
+		setBusy(false);
 	};
+	/** 关闭弹窗并恢复到第一步。 */
 	const handleClose = () => {
+		if (busy) return;
 		reset();
 		onClose();
 	};
+	/** 通过主进程选择待导入的 Excel 文件。 */
 	const handlePickFile = async () => {
 		const res = await api.system.selectFile({ extensions: ["xlsx"] });
-		if (res.canceled || !res.filePath) {
-			message.warning("未选择文件");
-			return;
-		}
+		if (res.canceled || !res.filePath) return;
 		setFilePath(res.filePath);
+		setPreviewResponse(null);
 		setStep(1);
 	};
+	/** 执行校验并停留在第二步展示完整结果。 */
 	const handlePreview = async () => {
-		if (!filePath) return;
+		if (!filePath || busy) return;
 		setBusy(true);
 		try {
-			const res = await onPreview(filePath);
-			setToken(res.token);
-			setPreviewOk(res.ok);
-			setPreviewMsg(res.message ?? (res.ok ? "校验通过" : "校验未通过"));
-			if (res.ok) setStep(2);
-		} catch (e) {
-			message.error(`预览失败：${e.message}`);
+			const response = await onPreview(filePath);
+			setPreviewResponse(response);
+		} catch (error) {
+			message.error(`校验失败：${error.message}`);
 		} finally {
 			setBusy(false);
 		}
 	};
+	/** 提交已校验的预览令牌，避免重复确认。 */
 	const handleConfirm = async () => {
-		if (!token) return;
+		if (!previewResponse?.token || !previewResponse.ok || busy) return;
 		setBusy(true);
 		try {
-			await onConfirm(token);
-			message.success("导入完成");
+			const result = await onConfirm(previewResponse.token);
+			setConfirmResult(result);
 			setStep(3);
-		} catch (e) {
-			message.error(`导入失败：${e.message}`);
+			message.success("导入完成");
+		} catch (error) {
+			message.error(`导入失败：${error.message}`);
 		} finally {
 			setBusy(false);
 		}
@@ -77385,12 +77427,15 @@ function ExcelImportStep({ open, title, templateName, onDownloadTemplate, onPrev
 		open,
 		onCancel: handleClose,
 		footer: null,
-		width: 560,
+		width,
+		maskClosable: false,
+		keyboard: !busy,
+		destroyOnHidden: true,
 		children: [
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Steps, {
 				current: step,
 				size: "small",
-				className: "!mb-4",
+				className: "!mb-5",
 				items: [
 					{ title: "选择文件" },
 					{ title: "校验" },
@@ -77398,77 +77443,112 @@ function ExcelImportStep({ open, title, templateName, onDownloadTemplate, onPrev
 					{ title: "完成" }
 				]
 			}),
-			step === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(button_default, {
-				icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RefIcon$10, {}),
-				onClick: () => void onDownloadTemplate(),
-				className: "!mb-3",
+			step === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "space-y-3",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(button_default, {
+					icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RefIcon$10, {}),
+					onClick: () => void onDownloadTemplate(),
+					children: [
+						"下载模板（",
+						templateName,
+						"）"
+					]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					type: "button",
+					className: "w-full border border-dashed border-[#b8c2cc] rounded-lg p-8 text-center cursor-pointer bg-[#fafcff] hover:border-brand transition-colors",
+					onClick: () => void handlePickFile(),
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(RefIcon$5, { className: "!text-[34px] !text-brand" }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "block mt-2 text-sm text-gray-700",
+							children: "点击选择 Excel 文件"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Text, {
+							type: "secondary",
+							children: "仅支持 .xlsx 模板"
+						})
+					]
+				})]
+			}),
+			step === 1 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "space-y-4",
 				children: [
-					"下载模板（",
-					templateName,
-					"）"
-				]
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: "border border-dashed border-[#d9d9d9] rounded-lg p-6 text-center cursor-pointer",
-				onClick: () => void handlePickFile(),
-				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(RefIcon$5, { className: "!text-[32px] !text-brand" }),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						className: "ant-upload-text",
-						children: "点击选择 Excel 文件"
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Alert, {
+						type: "info",
+						showIcon: true,
+						message: "已选择文件",
+						description: filePath
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Text, {
-						type: "secondary",
-						children: "仅支持 .xlsx 模板"
+					previewResponse && (renderPreview ? renderPreview(previewResponse.preview) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Alert, {
+						showIcon: true,
+						type: previewResponse.ok ? "success" : "error",
+						message: previewResponse.message ?? (previewResponse.ok ? "校验通过" : "校验未通过")
+					})),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "flex justify-end gap-2",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
+								disabled: busy,
+								onClick: reset,
+								children: "重新选择"
+							}),
+							!previewResponse && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
+								type: "primary",
+								loading: busy,
+								onClick: () => void handlePreview(),
+								children: "开始校验"
+							}),
+							previewResponse && !previewResponse.ok && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
+								type: "primary",
+								loading: busy,
+								onClick: () => void handlePreview(),
+								children: "重新校验"
+							}),
+							previewResponse?.ok && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
+								type: "primary",
+								onClick: () => setStep(2),
+								children: "下一步"
+							})
+						]
 					})
 				]
-			})] }),
-			step === 1 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Alert, {
-				type: "info",
-				message: `已选择：${filePath}`,
-				className: "!mb-3"
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: "text-right",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
-					className: "!mr-2",
-					onClick: () => setStep(0),
-					children: "上一步"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
-					type: "primary",
-					loading: busy,
-					onClick: handlePreview,
-					children: "校验"
+			}),
+			step === 2 && previewResponse && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "space-y-4",
+				children: [renderConfirmation ? renderConfirmation(previewResponse.preview) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Alert, {
+					type: "warning",
+					showIcon: true,
+					message: "请确认导入",
+					description: previewResponse.message ?? "校验已通过"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex justify-end gap-2",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
+						disabled: busy,
+						onClick: () => setStep(1),
+						children: "上一步"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
+						type: "primary",
+						loading: busy,
+						onClick: () => void handleConfirm(),
+						children: confirmText
+					})]
 				})]
-			})] }),
-			step === 2 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Alert, {
-				type: previewOk ? "success" : "error",
-				message: previewMsg ?? "校验未通过",
-				className: "!mb-3"
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: "text-right",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
-					className: "!mr-2",
-					onClick: () => setStep(1),
-					children: "上一步"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
-					type: "primary",
-					loading: busy,
-					disabled: !previewOk,
-					onClick: handleConfirm,
-					children: confirmText
+			}),
+			step === 3 && confirmResult !== null && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "space-y-4",
+				children: [renderCompletion ? renderCompletion(confirmResult) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Alert, {
+					type: "success",
+					showIcon: true,
+					message: "导入已完成"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "text-right",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
+						type: "primary",
+						onClick: handleClose,
+						children: "完成"
+					})
 				})]
-			})] }),
-			step === 3 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Alert, {
-				type: "success",
-				message: "导入已完成",
-				className: "!mb-3"
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-				className: "text-right",
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(button_default, {
-					type: "primary",
-					onClick: handleClose,
-					children: "完成"
-				})
-			})] })
+			})
 		]
 	});
 }
@@ -77486,7 +77566,8 @@ function InboundImportDialog({ open, onClose, onImported }) {
 		return {
 			token: res.token,
 			ok: !res.preview.hasErrors,
-			message: `校验完成，错误 ${(res.preview.errors ?? []).length} 条`
+			message: `校验完成，错误 ${(res.preview.errors ?? []).length} 条`,
+			preview: res.preview
 		};
 	};
 	const confirm = async (token) => {
@@ -77506,6 +77587,135 @@ function InboundImportDialog({ open, onClose, onImported }) {
 	});
 }
 //#endregion
+//#region src/renderer/pages/inventory/components/CatalogImportPreview.tsx
+var columns = [
+	{
+		title: "行号",
+		dataIndex: "rowIndex",
+		width: 72,
+		fixed: "left"
+	},
+	{
+		title: "项目名称",
+		dataIndex: "name",
+		width: 180,
+		ellipsis: true
+	},
+	{
+		title: "规格型号",
+		dataIndex: "model",
+		width: 140,
+		ellipsis: true
+	},
+	{
+		title: "单位",
+		dataIndex: "unit",
+		width: 80
+	},
+	{
+		title: "税收分类编码",
+		dataIndex: "taxClassificationCode",
+		width: 180,
+		ellipsis: true
+	},
+	{
+		title: "含税单价",
+		dataIndex: "unitPriceDecimal",
+		width: 130,
+		align: "right"
+	},
+	{
+		title: "状态",
+		width: 92,
+		render: (_, row) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tag, {
+			color: row.deduped ? "warning" : row.errors.length > 0 ? "error" : "success",
+			children: row.deduped ? "已去重" : row.errors.length > 0 ? "错误" : "正常"
+		})
+	},
+	{
+		title: "校验说明",
+		width: 260,
+		render: (_, row) => row.errors.length > 0 ? row.errors.join("；") : "可导入"
+	}
+];
+/** 展示商品导入的统计摘要和逐行校验结果。 */
+function CatalogImportPreviewPanel({ preview }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "space-y-3",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ImportStatistics, { preview }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Alert, {
+				showIcon: true,
+				type: preview.hasErrors ? "error" : "success",
+				message: preview.hasErrors ? "存在错误行，整批无法导入" : "校验通过，可进入确认步骤",
+				description: preview.hasErrors ? "请修正文件后重新选择或重新校验。" : void 0
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(table_default, {
+				rowKey: "rowIndex",
+				size: "small",
+				bordered: true,
+				columns,
+				dataSource: preview.rows,
+				pagination: false,
+				scroll: {
+					x: 1200,
+					y: 360
+				}
+			})
+		]
+	});
+}
+/** 展示最终写入前的商品导入确认摘要。 */
+function CatalogImportConfirmation({ preview }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "space-y-3",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Alert, {
+			type: "warning",
+			showIcon: true,
+			message: preview.isInitial ? "确认后将一次性写入全部有效商品及其初始库存。" : "确认后将一次性新增全部有效价格商品，已有商品价格和库存不会被修改。"
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ImportStatistics, { preview })]
+	});
+}
+/** 展示商品导入完成后的实际创建结果。 */
+function CatalogImportCompletion({ result }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Alert, {
+		type: "success",
+		showIcon: true,
+		message: `成功创建 ${result.createdCount} 条商品记录`,
+		description: `新增名称型号 ${result.newProductCount} 组，同名型号新价格 ${result.newPriceVariantCount} 条。`
+	});
+}
+/** 统一渲染预览和确认阶段的计数口径。 */
+function ImportStatistics({ preview }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Descriptions, {
+		size: "small",
+		bordered: true,
+		column: preview.isInitial ? 5 : 4,
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Descriptions.Item, {
+				label: "新增名称型号",
+				children: preview.newProductCount
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Descriptions.Item, {
+				label: "同名型号新价格",
+				children: preview.newPriceVariantCount
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Descriptions.Item, {
+				label: "文件内去重",
+				children: preview.dedupedRowCount
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Descriptions.Item, {
+				label: "错误",
+				children: preview.errorCount
+			}),
+			preview.isInitial && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Descriptions.Item, {
+				label: "初始库存合计",
+				children: preview.totalStockSum
+			})
+		]
+	});
+}
+//#endregion
 //#region src/renderer/pages/inventory/modals/CatalogInitialImportDialog.tsx
 function CatalogInitialImportDialog({ open, onClose, onImported }) {
 	const { message } = App$1.useApp();
@@ -77519,12 +77729,13 @@ function CatalogInitialImportDialog({ open, onClose, onImported }) {
 		return {
 			token: res.token,
 			ok: !res.preview.hasErrors,
-			message: `校验完成，错误 ${res.preview.errorCount} 条`
+			message: `校验完成，错误 ${res.preview.errorCount} 条`,
+			preview: res.preview
 		};
 	};
 	const confirm = async (token) => {
 		const res = await api.catalog.initialImportConfirm(token);
-		if (res.products >= 0) onImported();
+		if (res.createdCount >= 0) onImported();
 		return res;
 	};
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExcelImportStep, {
@@ -77534,6 +77745,10 @@ function CatalogInitialImportDialog({ open, onClose, onImported }) {
 		onDownloadTemplate: downloadTemplate,
 		onPreview: preview,
 		onConfirm: confirm,
+		renderPreview: (result) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CatalogImportPreviewPanel, { preview: result }),
+		renderConfirmation: (result) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CatalogImportConfirmation, { preview: result }),
+		renderCompletion: (result) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CatalogImportCompletion, { result }),
+		width: "90vw",
 		onClose
 	});
 }
@@ -77551,21 +77766,26 @@ function CatalogDailyImportDialog({ open, onClose, onImported }) {
 		return {
 			token: res.token,
 			ok: !res.preview.hasErrors,
-			message: `校验完成，错误 ${res.preview.errorCount} 条`
+			message: `校验完成，错误 ${res.preview.errorCount} 条`,
+			preview: res.preview
 		};
 	};
 	const confirm = async (token) => {
 		const res = await api.catalog.dailyImportConfirm(token);
-		if (res.products >= 0) onImported();
+		if (res.createdCount >= 0) onImported();
 		return res;
 	};
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExcelImportStep, {
 		open,
-		title: "商品每日导入",
-		templateName: "商品每日导入模板.xlsx",
+		title: "商品日常导入",
+		templateName: "商品日常导入模板.xlsx",
 		onDownloadTemplate: downloadTemplate,
 		onPreview: preview,
 		onConfirm: confirm,
+		renderPreview: (result) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CatalogImportPreviewPanel, { preview: result }),
+		renderConfirmation: (result) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CatalogImportConfirmation, { preview: result }),
+		renderCompletion: (result) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CatalogImportCompletion, { result }),
+		width: "90vw",
 		onClose
 	});
 }
@@ -77707,36 +77927,6 @@ function InventoryPage() {
 				className: "!text-lg !font-semibold text-gray-800 mb-3",
 				children: "库存与开票"
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Card, {
-				size: "small",
-				className: "!mb-3 !shadow-none",
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "flex items-center gap-8",
-					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-							className: "text-xs text-muted",
-							children: "总已选金额"
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-							className: "text-lg font-semibold text-brand",
-							children: ["¥", centToDisplay$1(selectedAmountCent)]
-						})] }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-							className: "text-xs text-muted",
-							children: "总库存（正数）"
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-							className: "text-lg font-semibold text-green-600",
-							children: stockSummary?.positiveStock ?? "-"
-						})] }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-							className: "text-xs text-muted",
-							children: "总负库存"
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-							className: "text-lg font-semibold text-red-500",
-							children: stockSummary?.negativeStock ?? "-"
-						})] })
-					]
-				})
-			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(InventoryToolbar, {
 				name,
 				model,
@@ -77778,7 +77968,11 @@ function InventoryPage() {
 						setPPageSize(s);
 						setPPage(1);
 					},
-					onQuantityChange: handleQuantityChange
+					onQuantityChange: handleQuantityChange,
+					toolbar: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(InventorySummaryBar, {
+						selectedAmountCent,
+						stockSummary
+					})
 				})
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(InventoryModalHost, {

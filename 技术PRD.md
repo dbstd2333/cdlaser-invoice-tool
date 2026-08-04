@@ -269,7 +269,9 @@ src/
 - `data_status`: complete/incomplete
 - `status`: active/inactive
 - `remark`
-- 唯一索引：`name_normalized + model_normalized`
+- 唯一索引：`name_normalized + model_normalized + unit_price_decimal`
+- 普通查询索引：`name_normalized + model_normalized`
+- 同名同型号不同价格为独立商品 ID，并分别维护 `stock_balance`
 
 ### 6.2 销项
 
@@ -369,7 +371,7 @@ IPC 使用 `invoke/handle` 请求响应模型，所有入参和出参均经 Zod 
 主要命名空间：
 
 - `customers.*`：分页、详情、新增、编辑、停用、首次导入预览、首次导入确认、历史。
-- `catalog.*`：商品及唯一含税单价 CRUD、商品首次导入、商品日常导入、库存查询。
+- `catalog.*`：名称、型号和规范化含税单价联合唯一的商品 CRUD、商品首次导入、商品日常导入、库存查询。
 - `outbound.*`：创建草稿校验、导出、列表、详情、重新下载、作废。
 - `replenishment.*`：月底负库存预览、导出、历史和重新下载。
 - `inbound.*`：月初总部进项预览、确认、列表、详情、作废。
@@ -421,7 +423,8 @@ IPC 使用 `invoke/handle` 请求响应模型，所有入参和出参均经 Zod 
 确认阶段必须重新解析文件或校验预览令牌，随后在单个 SQLite 事务中：
 
 - 插入进项批次与明细。
-- 精确匹配已有商品；导入价格不同时更新商品当前含税单价。
+- 按名称、型号和规范化含税单价精确匹配已有商品，不更新已有商品价格。
+- 名称型号已存在但价格未建档时阻止整批导入，要求先通过商品日常导入建档。
 - 已有负库存商品若导入量超过绝对值则回滚整批。
 - 已有非负库存商品允许继续增加。
 - 全新商品自动创建；缺少税收编码时标记 incomplete。

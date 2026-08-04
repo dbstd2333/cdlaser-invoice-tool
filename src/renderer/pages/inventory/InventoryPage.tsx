@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { App, Card } from 'antd';
+import { App } from 'antd';
 import type { Product } from '@shared/contracts/types';
 import type { StockSummary } from '@shared/schemas/index';
-import { centToDisplay, yuanToCent } from '@shared/money';
+import { yuanToCent } from '@shared/money';
 import { api } from '@renderer/api';
 import { InventoryToolbar } from './components/InventoryToolbar';
 import { InventoryTable } from './components/InventoryTable';
+import { InventorySummaryBar } from './components/InventorySummaryBar';
 import { InventoryModalHost, type InventoryDialogType } from './modals/InventoryModalHost';
 import { useSelectionStore } from '@renderer/stores/selection';
 
@@ -105,22 +106,6 @@ export function InventoryPage() {
   return (
     <div className="p-4 h-full flex flex-col">
       <div className="!text-lg !font-semibold text-gray-800 mb-3">库存与开票</div>
-      <Card size="small" className="!mb-3 !shadow-none">
-        <div className="flex items-center gap-8">
-          <div>
-            <div className="text-xs text-muted">总已选金额</div>
-            <div className="text-lg font-semibold text-brand">¥{centToDisplay(selectedAmountCent)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted">总库存（正数）</div>
-            <div className="text-lg font-semibold text-green-600">{stockSummary?.positiveStock ?? '-'}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted">总负库存</div>
-            <div className="text-lg font-semibold text-red-500">{stockSummary?.negativeStock ?? '-'}</div>
-          </div>
-        </div>
-      </Card>
       <InventoryToolbar
         name={name}
         model={model}
@@ -162,6 +147,7 @@ export function InventoryPage() {
           setPPage(1);
         }}
         onQuantityChange={handleQuantityChange}
+        toolbar={<InventorySummaryBar selectedAmountCent={selectedAmountCent} stockSummary={stockSummary} />}
       />
       </div>
       <InventoryModalHost

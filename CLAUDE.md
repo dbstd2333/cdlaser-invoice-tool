@@ -70,7 +70,7 @@ pnpm db:migrate           # Drizzle Kit 执行迁移
 
 | 领域 | 目录 | 核心功能 |
 | --- | --- | --- |
-| 商品 | `domains/catalog/` | 商品 CRUD、唯一含税单价管理、首次/日常导入（预览→确认） |
+| 商品 | `domains/catalog/` | 商品 CRUD、同名同型号多价格管理、首次/日常导入（预览→确认） |
 | 客户 | `domains/customers/` | 客户 CRUD、首次导入、字段历史查询 |
 | 销项开票 | `domains/outbound/` | 草稿校验、XLSX 生成、事务导出、分页查询、作废恢复库存 |
 | 进项导入 | `domains/inbound/` | 文件解析预览、事务确认、作废、列表查询 |
@@ -93,7 +93,7 @@ pnpm db:migrate           # Drizzle Kit 执行迁移
 | 表 | 说明 |
 | --- | --- |
 | customers | 客户（含规范化税号、状态、默认开票地址） |
-| products | 商品（名称+规格型号联合唯一，含唯一含税单价和库存余额） |
+| products | 商品价格档案（名称+规格型号+规范化含税单价联合唯一，每条拥有独立库存） |
 | outbound_batches | 销项开票批次（含 XLSX Blob 存储） |
 | outbound_lines | 销项明细行（含扣减前后库存快照） |
 | inbound_batches | 进项导入批次（含原始文件 Blob 和双重 SHA-256） |
@@ -126,7 +126,7 @@ pnpm db:migrate           # Drizzle Kit 执行迁移
 ## 渲染进程页面
 
 - `/customers` — 客户管理（CRUD、首次导入、字段历史）
-- `/inventory` — 商品、库存与开票（商品唯一含税单价管理、跨分页选择、销项开票、商品导入、进项导入、月底负库存导出、库存调整、库存流水）
+- `/inventory` — 商品、库存与开票（同名同型号多价格管理、跨分页选择、销项开票、商品导入、进项导入、月底负库存导出、库存调整、库存流水）
 - `/outbound-records` — 开票记录（批次查询、明细查看、重新下载、作废恢复）
 
 ## 测试结构
